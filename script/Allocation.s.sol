@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.24;
 
 import {Script} from "forge-std/Script.sol";
-import {Counter} from "../src/Counter.sol";
+import {Allocation} from "../src/Allocation.sol";
 
-contract CounterScript is Script {
-    Counter public counter;
+contract AllocationScript is Script {
+    Allocation public allocation;
 
     function setUp() public {}
 
