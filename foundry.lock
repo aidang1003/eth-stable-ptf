@@ -11,7 +11,10 @@
       "rev": "fcbae5394ae8ad52d8e580a3477db99814b9d565"
     }
   },
-  "lib/v2-periphery": {
-    "rev": "0335e8f7e1bd1e8d8329fd300aea2ef2f36dd19f"
+  "lib/v3-periphery": {
+    "tag": {
+      "name": "v1.3.0",
+      "rev": "80f26c86c57b8a5e4b913f42844d4c8bd274d058"
+    }
   }
 }
