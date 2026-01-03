@@ -30,14 +30,20 @@ contract AllocationTest is Test {
         vm.startPrank(user);
         (bool sent, ) = address(allocation).call{value: 1 ether}("");
         require(sent, "Failed to send Ether");
-        assertEq(allocation.userEthBalances(user), 1 ether);
+        (uint256 ethBalance, uint256 usdcBalance) = allocation.getMyBalance();
+        console2.log("User ETH balance in contract:", ethBalance);
+        console2.log("User USDC balance in contract:", usdcBalance);
+        assertEq(ethBalance, 1e18);
         vm.stopPrank();
     }   
     
     function test_TokenDeposit() public {
         vm.startPrank(user);
         allocation.depositToken(100e6); //USDC has 6 decimals
-        assertEq(allocation.userUsdcBalances(user), 100e6);
+        (uint256 ethBalance, uint256 usdcBalance) = allocation.getMyBalance();
+        console2.log("User ETH balance in contract:", ethBalance);
+        console2.log("User USDC balance in contract:", usdcBalance);
+        assertEq(usdcBalance, 100e6);
         vm.stopPrank();
     }
 
@@ -46,7 +52,7 @@ contract AllocationTest is Test {
         (bool sent, ) = address(allocation).call{value: 2 ether}("");
         require(sent, "Failed to send Ether");
         allocation.depositToken(200e6); //USDC has 6 decimals
-        (uint256 ethBalance, uint256 usdcBalance) = allocation.getmyBalance();
+        (uint256 ethBalance, uint256 usdcBalance) = allocation.getMyBalance();
         assertEq(ethBalance, 2 ether);
         assertEq(usdcBalance, 200e6);
         vm.stopPrank();
