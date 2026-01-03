@@ -7,22 +7,24 @@ import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUn
 import {console2} from "forge-std/console2.sol";
 
 contract Allocation {
-    /* Global Variables */
-    uint256 private ethToUsdcAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 100, number between 0-100
-    address public token; //Specify token, will be USDC address on deployment
-    address[] public users;
-    IUniswapV2Router02 public uniswapV2Router02 = IUniswapV2Router02(UNISWAP_V2_ROUTER02); // Uniswap V2 Router address on Ethereum mainnet
-    address[] path = new address[](2);
-    uint256[] returnAmounts = new uint256[](path.length);
+    /* Internal Global Variables */
+    uint24 private ethToUsdcAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 100, number between 0-100
+    uint24 private currentEthToUsdcAllocationPercentage;
+    address[] private path = new address[](2);
+    uint256[] private returnAmounts = new uint256[](path.length);
     uint256 usdcValueOfEth = 0;
-    uint256 totalPortfolioValueInUsdc;
-    uint24 currentEthToUsdcAllocationPercentage;
+    uint256 private totalPortfolioValueInUsdc;
+
+    /* Global variables (external) */
+    address[] public users;
+    address public token; //Specify token, will be USDC address on deployment
+    IUniswapV2Router02 public uniswapV2Router02 = IUniswapV2Router02(UNISWAP_V2_ROUTER02); // Uniswap V2 Router address on Ethereum mainnet
 
     /* Mappings */
     mapping (address => uint256[2]) private userBalancesEthUsdc; // mapping to store user balances [ethBalance, usdcBalance]
 
 
-    constructor(address _token, uint256 _ethToUsdcAllocationPercentage) {
+    constructor(address _token, uint24 _ethToUsdcAllocationPercentage) {
         token = _token;
         ethToUsdcAllocationPercentage = _ethToUsdcAllocationPercentage;
     }
@@ -136,12 +138,12 @@ contract Allocation {
         userBalancesEthUsdc[msg.sender][0] = 0;
     }
 
-    function setethToUsdcAllocationPercentage(uint256 _allocation) external {
+    function setEthToUsdcAllocationPercentage(uint24 _allocation) external {
         require(_allocation <= 100 && _allocation > 0, "Allocation must be between 0 and 100");
         ethToUsdcAllocationPercentage = _allocation;
     }
 
-    function getethToUsdcAllocationPercentage() external view returns (uint256) {
+    function getEthToUsdcAllocationPercentage() external view returns (uint256) {
         return ethToUsdcAllocationPercentage;
     }
 
