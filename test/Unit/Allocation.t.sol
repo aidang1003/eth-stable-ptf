@@ -58,7 +58,36 @@ contract AllocationTest is Test {
         vm.stopPrank();
     }
 
+    function test_BalanceAllocationWithHigherEth() public {
+        vm.startPrank(user);
+        (bool sent, ) = address(allocation).call{value: 1 ether}("");
+        require(sent, "Failed to send Ether");
+        (uint256 ethBalance, uint256 usdcBalance) = allocation.getMyBalance();
+        console2.log("Pre-allocation User ETH balance in contract:", ethBalance);
+        console2.log("Pre-allocation User USDC balance in contract:", usdcBalance);
 
+        // Run the allocation balancing
+        allocation.balanceAllocation(user);
+        (ethBalance, usdcBalance) = allocation.getMyBalance();
+        console2.log("Post-allocation User ETH balance in contract:", ethBalance);
+        console2.log("Post-allocation User USDC balance in contract:", usdcBalance);
+        vm.stopPrank();
+    }
+
+    function test_BalanceAllocationWithHigherUsdc() public {
+        vm.startPrank(user);
+        allocation.depositToken(1000e6); //USDC has 6 decimals
+        (uint256 ethBalance, uint256 usdcBalance) = allocation.getMyBalance();
+        console2.log("Pre-allocation User ETH balance in contract:", ethBalance);
+        console2.log("Pre-allocation User USDC balance in contract:", usdcBalance);
+
+        // Run the allocation balancing
+        allocation.balanceAllocation(user);
+        (ethBalance, usdcBalance) = allocation.getMyBalance();
+        console2.log("Post-allocation User ETH balance in contract:", ethBalance);
+        console2.log("Post-allocation User USDC balance in contract:", usdcBalance);
+        vm.stopPrank();
+    }
 
     // function testFuzz_SetNumber(uint256 x) public {
     //     allocation.setNumber(x);
