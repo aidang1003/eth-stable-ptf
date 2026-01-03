@@ -11,6 +11,8 @@ contract Allocation {
     mapping (address => uint256) public userEthBalances;
     mapping (address => uint256) public userUsdcBalances;
 
+    address[] public users;
+
     constructor(address _token, uint256 _ethToUsdcAllocation) {
         token = _token;
         ethToUsdcAllocation = _ethToUsdcAllocation;
@@ -25,12 +27,27 @@ contract Allocation {
     function depositToken(uint256 _amount) public payable {
         // Deposit USDC tokens to the contract
         require(_amount > 0, "Amount must be greater than 0");
+
+        // Add user to users array if not already present
+        for (uint256 i = 0; i < users.length; i++) {
+            if (users[i] == msg.sender) {
+                return;
+            } if (i == users.length - 1) {
+                users.push(msg.sender);
+            } else {
+                continue;
+            }
+        }
+        
         bool transferred = IERC20(token).transferFrom(msg.sender, address(this), _amount);
         require(transferred, "Token transfer failed");
         userUsdcBalances[msg.sender] += _amount;
     }
 
-    // Create a function that calls a limit swap from uniswap
+    // Create a function that balance a user's allocation immeditley with a call to the uniswap v2 periphery contract
+    function balanceAllocation(address _user) public {
+        
+    }
 
     // Create a function to withdraw tokens
     function withdrawAllTokens(address _token) external {
@@ -50,6 +67,11 @@ contract Allocation {
 
     function getEthToUsdcAllocation() external view returns (uint256) {
         return ethToUsdcAllocation;
+    }
+
+    function getmyBalance() external view returns (uint256 ethBalance, uint256 usdcBalance) {
+        ethBalance = userEthBalances[msg.sender];
+        usdcBalance = userUsdcBalances[msg.sender];
     }
 
 

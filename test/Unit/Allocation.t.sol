@@ -41,6 +41,17 @@ contract AllocationTest is Test {
         vm.stopPrank();
     }
 
+    function test_GetMyBalance() public {
+        vm.startPrank(user);
+        (bool sent, ) = address(allocation).call{value: 2 ether}("");
+        require(sent, "Failed to send Ether");
+        allocation.depositToken(200e6); //USDC has 6 decimals
+        (uint256 ethBalance, uint256 usdcBalance) = allocation.getmyBalance();
+        assertEq(ethBalance, 2 ether);
+        assertEq(usdcBalance, 200e6);
+        vm.stopPrank();
+    }
+
 
 
     // function testFuzz_SetNumber(uint256 x) public {
