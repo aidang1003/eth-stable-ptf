@@ -62,30 +62,38 @@ contract AllocationTest is Test {
         vm.startPrank(user);
         (bool sent, ) = address(allocation).call{value: 1 ether}("");
         require(sent, "Failed to send Ether");
+        allocation.depositToken(1000e6); //USDC has 6 decimals
         (uint256 ethBalance, uint256 usdcBalance) = allocation.getMyBalance();
-        console2.log("Pre-allocation User ETH balance in contract:", ethBalance);
-        console2.log("Pre-allocation User USDC balance in contract:", usdcBalance);
+
+        console2.log("Pre-allocation ETH balance in contract: %e", address(allocation).balance);
+        console2.log("Pre-allocation USDC balance in contract: %e", IERC20(token).balanceOf(address(allocation)));
 
         // Run the allocation balancing
         allocation.balanceAllocation(user);
         (ethBalance, usdcBalance) = allocation.getMyBalance();
-        console2.log("Post-allocation User ETH balance in contract:", ethBalance);
-        console2.log("Post-allocation User USDC balance in contract:", usdcBalance);
+
+        console2.log("Post-allocation ETH balance in contract: %e", address(allocation).balance);
+        console2.log("Post-allocation USDC balance in contract: %e", IERC20(token).balanceOf(address(allocation)));
+
         vm.stopPrank();
     }
 
     function test_BalanceAllocationWithHigherUsdc() public {
         vm.startPrank(user);
+        (bool sent, ) = address(allocation).call{value: 1e17}("");
+        require(sent, "Failed to send Ether");
+
         allocation.depositToken(1000e6); //USDC has 6 decimals
         (uint256 ethBalance, uint256 usdcBalance) = allocation.getMyBalance();
-        console2.log("Pre-allocation User ETH balance in contract:", ethBalance);
-        console2.log("Pre-allocation User USDC balance in contract:", usdcBalance);
+
+        console2.log("Pre-allocation ETH balance in contract: %e", address(allocation).balance);
+        console2.log("Pre-allocation USDC balance in contract: %e", IERC20(token).balanceOf(address(allocation)));
 
         // Run the allocation balancing
         allocation.balanceAllocation(user);
         (ethBalance, usdcBalance) = allocation.getMyBalance();
-        console2.log("Post-allocation User ETH balance in contract:", ethBalance);
-        console2.log("Post-allocation User USDC balance in contract:", usdcBalance);
+        console2.log("Post-allocation ETH balance in contract: %e", address(allocation).balance);
+        console2.log("Post-allocation USDC balance in contract: %e", IERC20(token).balanceOf(address(allocation)));
         vm.stopPrank();
     }
 

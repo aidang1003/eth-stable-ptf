@@ -12,6 +12,11 @@ contract Allocation {
     address public token; //Specify token, will be USDC address on deployment
     address[] public users;
     IUniswapV2Router02 public uniswapV2Router02 = IUniswapV2Router02(UNISWAP_V2_ROUTER02); // Uniswap V2 Router address on Ethereum mainnet
+    address[] path = new address[](2);
+    uint256[] returnAmounts = new uint256[](path.length);
+    uint256 usdcValueOfEth = 0;
+    uint256 totalPortfolioValueInUsdc;
+    uint24 currentEthToUsdcAllocationPercentage;
 
     /* Mappings */
     mapping (address => uint256[2]) private userBalancesEthUsdc; // mapping to store user balances [ethBalance, usdcBalance]
@@ -48,62 +53,67 @@ contract Allocation {
         userBalancesEthUsdc[msg.sender][1] += _amount;
     }
 
+    function updateCurrentAllocationPercentage(address _user) public {
+        // Get the Eth conversion rate for USDC from Uniswap
+        // Set the Eth value in USDC, total portfolio value in USDC, and current allocation percentage
+        if (userBalancesEthUsdc[_user][0] > 0) {
+            (path[0], path[1]) = (WETH_ADDRESS, USDC_ADDRESS);
+
+            uint[] memory amounts = uniswapV2Router02.getAmountsOut(userBalancesEthUsdc[_user][0], path);
+            usdcValueOfEth = amounts[1]; // Eth in portfolio represented in USDC
+            totalPortfolioValueInUsdc = usdcValueOfEth + userBalancesEthUsdc[_user][1];
+            currentEthToUsdcAllocationPercentage = uint24((usdcValueOfEth * 100) / (usdcValueOfEth + userBalancesEthUsdc[_user][1]));
+        } else {
+            totalPortfolioValueInUsdc = userBalancesEthUsdc[_user][1];
+            currentEthToUsdcAllocationPercentage = 0;
+        }
+        
+        console2.log("Current ETH to USDC allocation percentage:", currentEthToUsdcAllocationPercentage);
+    }
+
     // Create a function that balance a user's allocation immeditley with a call to the uniswap v2 periphery contract
     function balanceAllocation(address _user) public {
         require(userBalancesEthUsdc[_user][0] >= 0 || userBalancesEthUsdc[_user][1] >= 0, "Insufficient ETH or USDC balance");
-        address[] memory path = new address[](2);
-        uint256[] memory returnAmounts = new uint256[](path.length);
-        uint256 usdcValueOfEth = 0;
-
-        // Get the Eth conversion rate for USDC from Uniswap
-        if (userBalancesEthUsdc[_user][0] > 0) {
-            path[0] = WETH_ADDRESS;
-            path[1] = USDC_ADDRESS;
-            uint[] memory amounts = uniswapV2Router02.getAmountsOut(userBalancesEthUsdc[_user][0], path);
-
-            // Eth in portfolio represented in USDC
-            usdcValueOfEth = amounts[1];
-            console2.log("(amounts[1]) Estimated USDC from ETH:", usdcValueOfEth);
-        } 
         
-        uint256 totalPortfolioValue = userBalancesEthUsdc[_user][1] + usdcValueOfEth;
-        console2.log("Total portfolio value in USDC:", totalPortfolioValue);
+        // Call function to update current allocation percentage
+        updateCurrentAllocationPercentage(_user);
         
-        if ((usdcValueOfEth / totalPortfolioValue) * 100 > ethToUsdcAllocationPercentage) {
+        // Make swaps based on current vs desired allocation percentage
+        if (currentEthToUsdcAllocationPercentage > ethToUsdcAllocationPercentage) {
         // If the user has more ETH than the desired allocation, swap ETH for USDC
-            uint256 minUsdcToRecieve = (usdcValueOfEth * ethToUsdcAllocationPercentage / 100) - (userBalancesEthUsdc[_user][1] * 100 / totalPortfolioValue);
-            console2.log("ETH to swap for USDC:", minUsdcToRecieve);
+            uint256 maxEthToSend = userBalancesEthUsdc[_user][0] * ethToUsdcAllocationPercentage / 100; //Won't work for all values
+            uint256 minUsdcToRecieve = (usdcValueOfEth * ethToUsdcAllocationPercentage / 100) - (userBalancesEthUsdc[_user][1] * 100 / totalPortfolioValueInUsdc);
+            console2.log("ETH to swap for USDC: %e", minUsdcToRecieve);
 
             require(minUsdcToRecieve > 0, "No ETH to swap for USDC");
 
-            path[0] = WETH_ADDRESS;
-            path[1] = USDC_ADDRESS;
+            (path[0], path[1]) = (WETH_ADDRESS, USDC_ADDRESS);
 
             IERC20(WETH_ADDRESS).approve(address(uniswapV2Router02), minUsdcToRecieve);
-            returnAmounts = uniswapV2Router02.swapExactETHForTokens{value: 5e17}({
+            returnAmounts = uniswapV2Router02.swapExactETHForTokens{value: maxEthToSend}({
                 amountOutMin: minUsdcToRecieve,
                 path: path,
                 to: address(this),
                 deadline: block.timestamp + 15 minutes
             });
-        } else if ((usdcValueOfEth / totalPortfolioValue) * 100 > ethToUsdcAllocationPercentage) {
+        } else if (currentEthToUsdcAllocationPercentage < ethToUsdcAllocationPercentage) {
         // If the user has more USDC than the desired allocation, swap USDC for ETH
-            uint256 usdcToSwap = (userBalancesEthUsdc[_user][1] * 100 / totalPortfolioValue) - (usdcValueOfEth * ethToUsdcAllocationPercentage / 100);
-            console2.log("USDC to swap for ETH:", usdcToSwap);
+            uint256 usdcToSwap = (ethToUsdcAllocationPercentage - currentEthToUsdcAllocationPercentage) * userBalancesEthUsdc[_user][1] / 100;
+            console2.log("USDC to swap for ETH: %e", usdcToSwap);
 
             require(usdcToSwap > 0, "No USDC to swap for ETH");
 
-            path[0] = USDC_ADDRESS;
-            path[1] = WETH_ADDRESS;
+            (path[0], path[1]) = (USDC_ADDRESS, WETH_ADDRESS);
 
             IERC20(USDC_ADDRESS).approve(address(uniswapV2Router02), usdcToSwap);
-            returnAmounts = uniswapV2Router02.swapTokensForExactTokens({
-                amountOut: usdcToSwap,
-                amountInMax: 0, // verify this works with 0, then calculate acceptable slippage for real value
+            returnAmounts = uniswapV2Router02.swapExactTokensForETH({ 
+                amountIn: usdcToSwap,
+                amountOutMin: 0, // Verify this works with 0, then calculate acceptable slippage for real value
                 path: path,
                 to: address(this),
                 deadline: block.timestamp + 15 minutes
             });
+            
         } else {
             console2.log("User allocation is already withing an acceptable range or you have an arithmetic/logic error");
             return;
