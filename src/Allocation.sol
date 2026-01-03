@@ -8,11 +8,11 @@ import {console2} from "forge-std/console2.sol";
 
 contract Allocation {
     /* Internal Global Variables */
-    uint24 private ethToUsdcAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 100, number between 0-100
+    uint24 private ethToUsdcAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
     uint24 private currentEthToUsdcAllocationPercentage;
     address[] private path = new address[](2);
     uint256[] private returnAmounts = new uint256[](path.length);
-    uint256 usdcValueOfEth = 0;
+    uint256 usdcValueOfEth;
     uint256 private totalPortfolioValueInUsdc;
 
     /* Global variables (external) */
@@ -76,7 +76,7 @@ contract Allocation {
     // Create a function that balance a user's allocation immeditley with a call to the uniswap v2 periphery contract
     function balanceAllocation(address _user) public {
         require(userBalancesEthUsdc[_user][0] >= 0 || userBalancesEthUsdc[_user][1] >= 0, "Insufficient ETH or USDC balance");
-        
+        usdcValueOfEth = 0;
         // Call function to update current allocation percentage
         updateCurrentAllocationPercentage(_user);
         
