@@ -2,15 +2,18 @@
 pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {IUniswapV2Router02} from "@uniswap-v2-per/interfaces/IUniswapV2Router02.sol";
 
 contract Allocation {
+    /* Global Variables */
     uint256 private ethToUsdcAllocation; // percentage allocation for ETH, number between 0-100
-
     address public token; //Specify token, will be USDC address on deployment
+    address[] public users;
+    IUniswapV2Router02 public uniswapV2Router02 = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D); // Uniswap V2 Router address on Ethereum mainnet
 
+    /* Mappings */
     mapping (address => uint256[2]) public userBalancesEthUsdc; // mapping to store user balances [ethBalance, usdcBalance]
 
-    address[] public users;
 
     constructor(address _token, uint256 _ethToUsdcAllocation) {
         token = _token;
@@ -52,8 +55,13 @@ contract Allocation {
     function withdrawAllTokens(address _token) external {
         require(userBalancesEthUsdc[msg.sender][0] >= 0, "Insufficient ETH balance");
         require(userBalancesEthUsdc[msg.sender][1] >= 0, "Insufficient USDC balance");
-        IERC20(_token).transfer(msg.sender, userBalancesEthUsdc[msg.sender][1]);
+
+        // withdraw USDC
+        bool transferred = IERC20(_token).transfer(msg.sender, userBalancesEthUsdc[msg.sender][1]);
+        require(transferred, "Token transfer failed");
         userBalancesEthUsdc[msg.sender][1] = 0;
+
+        // withdraw ETH
         (bool sent, /* bytes memory data */) = msg.sender.call{value: userBalancesEthUsdc[msg.sender][0]}("");
         require(sent, "Failed to send Ether");
         userBalancesEthUsdc[msg.sender][0] = 0;
