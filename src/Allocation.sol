@@ -111,7 +111,7 @@ contract Allocation {
         });
 
         // Update user balances
-        userBalancesEthUsdc[_user][0] -= returnAmounts[0];
+        userBalancesEthUsdc[_user][0] -= maxEthToSend;
         userBalancesEthUsdc[_user][1] += returnAmounts[1];
     }
 
