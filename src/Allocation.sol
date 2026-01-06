@@ -8,7 +8,7 @@ import {console2} from "forge-std/console2.sol";
 
 contract Allocation {
     /* Internal Global Variables */
-    uint24 private ethToUsdcAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
+    uint24 private desiredEthToUsdcAllocationPerccentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
     uint24 private currentEthToUsdcAllocationPercentage;
     address[] private path = new address[](2);
     uint256[] private returnAmounts = new uint256[](path.length);
@@ -24,9 +24,9 @@ contract Allocation {
     mapping (address => uint256[2]) private userBalancesEthUsdc; // mapping to store user balances [ethBalance, usdcBalance]
 
 
-    constructor(address _token, uint24 _ethToUsdcAllocationPercentage) {
+    constructor(address _token, uint24 _desiredEthToUsdcAllocationPerccentage) {
         token = _token;
-        ethToUsdcAllocationPercentage = _ethToUsdcAllocationPercentage;
+        desiredEthToUsdcAllocationPerccentage = _desiredEthToUsdcAllocationPerccentage;
         usdcValueOfEth = 0;
     }
 
@@ -81,9 +81,9 @@ contract Allocation {
         updateCurrentAllocationPercentage(_user);
         
         // Make swaps based on current vs desired allocation percentage
-        if (currentEthToUsdcAllocationPercentage > ethToUsdcAllocationPercentage) {
+        if (currentEthToUsdcAllocationPercentage > desiredEthToUsdcAllocationPerccentage) {
             swapEthToUsdc(_user);
-        } else if (currentEthToUsdcAllocationPercentage < ethToUsdcAllocationPercentage) {
+        } else if (currentEthToUsdcAllocationPercentage < desiredEthToUsdcAllocationPerccentage) {
             swapUsdcToEth(_user);
         } else {
             console2.log("User allocation is already withing an acceptable range or you have an arithmetic/logic error");
@@ -92,8 +92,8 @@ contract Allocation {
 
     function swapEthToUsdc(address _user) private {
         // If the user has more ETH than the desired allocation, swap ETH for USDC
-        uint256 maxEthToSend = userBalancesEthUsdc[_user][0] * ethToUsdcAllocationPercentage / 100; //Won't work for all values
-        uint256 minUsdcToRecieve = (usdcValueOfEth * ethToUsdcAllocationPercentage / 100) - (userBalancesEthUsdc[_user][1] * 100 / totalPortfolioValueInUsdc);
+        uint256 maxEthToSend = userBalancesEthUsdc[_user][0] * desiredEthToUsdcAllocationPerccentage / 100; //Won't work for all values
+        uint256 minUsdcToRecieve = (usdcValueOfEth * desiredEthToUsdcAllocationPerccentage / 100) - (userBalancesEthUsdc[_user][1] * 100 / totalPortfolioValueInUsdc);
         console2.log("ETH to swap for USDC: %e", minUsdcToRecieve);
 
         require(minUsdcToRecieve > 0, "No ETH to swap for USDC");
@@ -117,7 +117,7 @@ contract Allocation {
 
     function swapUsdcToEth(address _user) private {
         // If the user has more USDC than the desired allocation, swap USDC for ETH
-        uint256 usdcToSwap = (ethToUsdcAllocationPercentage - currentEthToUsdcAllocationPercentage) * userBalancesEthUsdc[_user][1] / 100;
+        uint256 usdcToSwap = (desiredEthToUsdcAllocationPerccentage - currentEthToUsdcAllocationPercentage) * userBalancesEthUsdc[_user][1] / 100;
         console2.log("USDC to swap for ETH: %e", usdcToSwap);
 
         require(usdcToSwap > 0, "No USDC to swap for ETH");
@@ -156,13 +156,13 @@ contract Allocation {
         userBalancesEthUsdc[msg.sender][0] = 0;
     }
 
-    function setEthToUsdcAllocationPercentage(uint24 _allocation) external {
+    function setdesiredEthToUsdcAllocationPerccentage(uint24 _allocation) external {
         require(_allocation <= 100 && _allocation > 0, "Allocation must be between 0 and 100");
-        ethToUsdcAllocationPercentage = _allocation;
+        desiredEthToUsdcAllocationPerccentage = _allocation;
     }
 
-    function getEthToUsdcAllocationPercentage() external view returns (uint256) {
-        return ethToUsdcAllocationPercentage;
+    function getdesiredEthToUsdcAllocationPerccentage() external view returns (uint256) {
+        return desiredEthToUsdcAllocationPerccentage;
     }
 
     function getMyBalance() external view returns (uint256 ethBalance, uint256 usdcBalance) {
