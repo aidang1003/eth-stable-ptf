@@ -109,6 +109,10 @@ contract Allocation {
             to: address(this),
             deadline: block.timestamp + 15 minutes
         });
+
+        // Update user balances
+        userBalancesEthUsdc[_user][0] -= returnAmounts[0];
+        userBalancesEthUsdc[_user][1] += returnAmounts[1];
     }
 
     function swapUsdcToEth(address _user) private {
@@ -129,7 +133,11 @@ contract Allocation {
             path: path,
             to: address(this),
             deadline: block.timestamp + 15 minutes
-        });     
+        });  
+
+        // Update user balances
+        userBalancesEthUsdc[_user][1] -= returnAmounts[0];
+        userBalancesEthUsdc[_user][0] += returnAmounts[1];   
     }
 
     // Create a function to withdraw tokens
