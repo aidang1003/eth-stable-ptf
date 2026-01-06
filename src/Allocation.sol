@@ -27,6 +27,7 @@ contract Allocation {
     constructor(address _token, uint24 _ethToUsdcAllocationPercentage) {
         token = _token;
         ethToUsdcAllocationPercentage = _ethToUsdcAllocationPercentage;
+        usdcValueOfEth = 0;
     }
 
     /** Fund the contract by sending eth or calling depositToken() */
@@ -76,50 +77,59 @@ contract Allocation {
     // Create a function that balance a user's allocation immeditley with a call to the uniswap v2 periphery contract
     function balanceAllocation(address _user) public {
         require(userBalancesEthUsdc[_user][0] >= 0 || userBalancesEthUsdc[_user][1] >= 0, "Insufficient ETH or USDC balance");
-        usdcValueOfEth = 0;
         // Call function to update current allocation percentage
         updateCurrentAllocationPercentage(_user);
         
         // Make swaps based on current vs desired allocation percentage
         if (currentEthToUsdcAllocationPercentage > ethToUsdcAllocationPercentage) {
-        // If the user has more ETH than the desired allocation, swap ETH for USDC
-            uint256 maxEthToSend = userBalancesEthUsdc[_user][0] * ethToUsdcAllocationPercentage / 100; //Won't work for all values
-            uint256 minUsdcToRecieve = (usdcValueOfEth * ethToUsdcAllocationPercentage / 100) - (userBalancesEthUsdc[_user][1] * 100 / totalPortfolioValueInUsdc);
-            console2.log("ETH to swap for USDC: %e", minUsdcToRecieve);
-
-            require(minUsdcToRecieve > 0, "No ETH to swap for USDC");
-
-            (path[0], path[1]) = (WETH_ADDRESS, USDC_ADDRESS);
-
-            IERC20(WETH_ADDRESS).approve(address(uniswapV2Router02), minUsdcToRecieve);
-            returnAmounts = uniswapV2Router02.swapExactETHForTokens{value: maxEthToSend}({
-                amountOutMin: minUsdcToRecieve,
-                path: path,
-                to: address(this),
-                deadline: block.timestamp + 15 minutes
-            });
+            swapEthToUsdc(_user);
         } else if (currentEthToUsdcAllocationPercentage < ethToUsdcAllocationPercentage) {
-        // If the user has more USDC than the desired allocation, swap USDC for ETH
-            uint256 usdcToSwap = (ethToUsdcAllocationPercentage - currentEthToUsdcAllocationPercentage) * userBalancesEthUsdc[_user][1] / 100;
-            console2.log("USDC to swap for ETH: %e", usdcToSwap);
-
-            require(usdcToSwap > 0, "No USDC to swap for ETH");
-
-            (path[0], path[1]) = (USDC_ADDRESS, WETH_ADDRESS);
-
-            IERC20(USDC_ADDRESS).approve(address(uniswapV2Router02), usdcToSwap);
-            returnAmounts = uniswapV2Router02.swapExactTokensForETH({ 
-                amountIn: usdcToSwap,
-                amountOutMin: 0, // Verify this works with 0, then calculate acceptable slippage for real value
-                path: path,
-                to: address(this),
-                deadline: block.timestamp + 15 minutes
-            });
-            
+            swapUsdcToEth(_user);
         } else {
             console2.log("User allocation is already withing an acceptable range or you have an arithmetic/logic error");
-            return;
         }
+    }
+
+    function swapEthToUsdc(address _user) private {
+        // If the user has more ETH than the desired allocation, swap ETH for USDC
+        uint256 maxEthToSend = userBalancesEthUsdc[_user][0] * ethToUsdcAllocationPercentage / 100; //Won't work for all values
+        uint256 minUsdcToRecieve = (usdcValueOfEth * ethToUsdcAllocationPercentage / 100) - (userBalancesEthUsdc[_user][1] * 100 / totalPortfolioValueInUsdc);
+        console2.log("ETH to swap for USDC: %e", minUsdcToRecieve);
+
+        require(minUsdcToRecieve > 0, "No ETH to swap for USDC");
+
+        (path[0], path[1]) = (WETH_ADDRESS, USDC_ADDRESS);
+
+        // Approve Uniswap router to spend ETH
+        IERC20(WETH_ADDRESS).approve(address(uniswapV2Router02), minUsdcToRecieve);
+
+        returnAmounts = uniswapV2Router02.swapExactETHForTokens{value: maxEthToSend}({
+            amountOutMin: minUsdcToRecieve,
+            path: path,
+            to: address(this),
+            deadline: block.timestamp + 15 minutes
+        });
+    }
+
+    function swapUsdcToEth(address _user) private {
+        // If the user has more USDC than the desired allocation, swap USDC for ETH
+        uint256 usdcToSwap = (ethToUsdcAllocationPercentage - currentEthToUsdcAllocationPercentage) * userBalancesEthUsdc[_user][1] / 100;
+        console2.log("USDC to swap for ETH: %e", usdcToSwap);
+
+        require(usdcToSwap > 0, "No USDC to swap for ETH");
+
+        (path[0], path[1]) = (USDC_ADDRESS, WETH_ADDRESS);
+
+        // Approve Uniswap router to spend USDC
+        IERC20(USDC_ADDRESS).approve(address(uniswapV2Router02), usdcToSwap);
+
+        returnAmounts = uniswapV2Router02.swapExactTokensForETH({ 
+            amountIn: usdcToSwap,
+            amountOutMin: 0, // Verify this works with 0, then calculate acceptable slippage for real value
+            path: path,
+            to: address(this),
+            deadline: block.timestamp + 15 minutes
+        });     
     }
 
     // Create a function to withdraw tokens
