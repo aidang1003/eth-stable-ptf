@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {UNISWAP_V2_ROUTER02, UNISWAP_V2_PAIR_ETH_USDC, WETH_ADDRESS, USDC_ADDRESS} from "./Constants.sol";
-import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import {console2} from "forge-std/console2.sol";
 
