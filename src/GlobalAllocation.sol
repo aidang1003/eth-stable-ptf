@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-contract GlobalAllocation {
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+
+contract GlobalAllocation is Ownable(msg.sender) {
     uint24 public desiredEthToUsdcAllocationPerccentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
     uint24 public rebalancePercentage; // percentage of the portfolio to rebalance at a time
 
@@ -13,5 +15,14 @@ contract GlobalAllocation {
         rebalancePercentage = _rebalancePercentage;
     }
 
-    
+    receive() external payable {
+        // Accept ETH deposits
+        require(msg.value > 0, "Must send ETH to deposit");
+
+
+    }
+
+    function withdraw() external onlyOwner{
+        // Placeholder for withdraw function
+    }
 }
