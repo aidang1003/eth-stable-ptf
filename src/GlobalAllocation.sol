@@ -22,7 +22,8 @@ contract GlobalAllocation is Ownable(msg.sender) {
 
     }
 
-    function withdraw() external onlyOwner{
-        // Placeholder for withdraw function
+    function withdraw() external onlyOwner {
+        (bool success, ) = msg.sender.call{value: address(this).balance}("");
+        require(success, "Transfer failed");
     }
 }
