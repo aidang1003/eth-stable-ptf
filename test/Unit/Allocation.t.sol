@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 import {Allocation} from "../../src/Allocation.sol";
-import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 contract AllocationTest is Test {
     Allocation public allocation;

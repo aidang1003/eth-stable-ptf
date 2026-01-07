@@ -6,18 +6,19 @@ import {UNISWAP_V2_ROUTER02} from "./Constants.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 contract GlobalAllocation is Ownable {
-    address public token; // Specify token to perform allocation on
-    uint24 public desiredEthToUsdcAllocationPerccentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
+    address public immutable token; // Specify token to perform allocation on
+    uint24 public immutable desiredEthToUsdcAllocationPerccentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
     uint24 public currentEthToUsdcAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
-    uint24 public rebalancePercentage; // percentage of the portfolio to rebalance at a time
+    uint24 public immutable rebalancePercentage; // percentage of the portfolio to rebalance at a time
 
-    IUniswapV2Router02 private constant uniswapV2Router02 = IUniswapV2Router02(UNISWAP_V2_ROUTER02); // Uniswap V2 Router address on Ethereum mainnet
+    IUniswapV2Router02 private immutable uniswapV2Router02;
 
-    constructor(address _token, uint24 _desiredEthToUsdcAllocationPerccentage, uint24 _rebalancePercentage) Ownable(msg.sender) {
+    constructor(address _token, address _uniswapRouter, uint24 _desiredEthToUsdcAllocationPerccentage, uint24 _rebalancePercentage) Ownable(msg.sender) {
         require(_desiredEthToUsdcAllocationPerccentage <= 1000000 && _desiredEthToUsdcAllocationPerccentage >= 10000, "Allocation percentage must be between 1.0000% and 100.0000%");
         require(_rebalancePercentage <= 100000 && _rebalancePercentage >= 1000, "Rebalance percentage must be between 0.1000% and 10.0000%");
 
         token = _token;
+        uniswapV2Router02 = IUniswapV2Router02(_uniswapRouter);
         desiredEthToUsdcAllocationPerccentage = _desiredEthToUsdcAllocationPerccentage;
         rebalancePercentage = _rebalancePercentage;
     }
