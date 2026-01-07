@@ -18,8 +18,7 @@ contract AllocationTest is Test {
 
         // Approve this contract to spend user's USDC
         vm.startPrank(user);
-        console2.log("Testing Contract address:", address(this));
-        console2.log("Allocation address:", address(allocation));
+ 
         IERC20(token).approve(address(allocation), type(uint256).max); // USDC has 6 decimals
         vm.stopPrank();
 
@@ -30,19 +29,20 @@ contract AllocationTest is Test {
         vm.startPrank(user);
         (bool sent, ) = address(allocation).call{value: 1 ether}("");
         require(sent, "Failed to send Ether");
-        (uint256 ethBalance, uint256 usdcBalance) = allocation.getMyBalance();
-        console2.log("User ETH balance in contract:", ethBalance);
-        console2.log("User USDC balance in contract:", usdcBalance);
+
+        // Check balance after sending Ether
+        (uint256 ethBalance, ) = allocation.getMyBalance();
+ 
         assertEq(ethBalance, 1e18);
+        // assertEq(ethBalance, address(allocation).balance, "Contract ETH does not match user ETH balance");
         vm.stopPrank();
     }   
     
     function test_TokenDeposit() public {
         vm.startPrank(user);
         allocation.depositToken(100e6); //USDC has 6 decimals
-        (uint256 ethBalance, uint256 usdcBalance) = allocation.getMyBalance();
-        console2.log("User ETH balance in contract:", ethBalance);
-        console2.log("User USDC balance in contract:", usdcBalance);
+        (, uint256 usdcBalance) = allocation.getMyBalance();
+
         assertEq(usdcBalance, 100e6);
         vm.stopPrank();
     }
@@ -60,56 +60,53 @@ contract AllocationTest is Test {
 
     function test_BalanceAllocationWithHigherEth() public {
         vm.startPrank(user);
-        (bool sent, ) = address(allocation).call{value: 1 ether}("");
+        (bool sent, ) = address(allocation).call{value: 10 ether}("");
         require(sent, "Failed to send Ether");
         allocation.depositToken(1000e6); //USDC has 6 decimals
-        (uint256 ethBalance, uint256 usdcBalance) = allocation.getMyBalance();
 
-        console2.log("Pre-allocation ETH balance in contract: %e", address(allocation).balance);
-        console2.log("Pre-allocation USDC balance in contract: %e", IERC20(token).balanceOf(address(allocation)));
-        (ethBalance, usdcBalance) = allocation.getMyBalance();
-        console2.log("Pre-allocation user's ETH balance in contract: %e", ethBalance);
-        console2.log("Pre-allocation user's USDC balance in contract: %e", usdcBalance);
+        // Get balances before rebalancing
+        (uint256 ethBeforeBalance, uint256 usdcBeforeBalance) = allocation.getMyBalance();
 
         // Run the allocation balancing
         allocation.balanceAllocation(user);
-        (ethBalance, usdcBalance) = allocation.getMyBalance();
-        console2.log("Post-allocation ETH balance in contract: %e", address(allocation).balance);
-        console2.log("Post-allocation USDC balance in contract: %e", IERC20(token).balanceOf(address(allocation)));
-        (ethBalance, usdcBalance) = allocation.getMyBalance();
-        console2.log("Post-allocation user's ETH balance in contract: %e", ethBalance);
-        console2.log("Post-allocation user's USDC balance in contract: %e", usdcBalance);
+
+        // Get balances after rebalancing
+        (uint256 ethAfterBalance, uint256 usdcAfterBalance) = allocation.getMyBalance();
 
         vm.stopPrank();
+
+        assertLt(usdcBeforeBalance, usdcAfterBalance, "USDC balance did not decrease after rebalancing");
+        assertGt(ethBeforeBalance, ethAfterBalance, "ETH balance did not increase after rebalancing");
+        assertEq(usdcAfterBalance, IERC20(token).balanceOf(address(allocation)), "User USDC balance does not match contract USDC balance");
+        // Contract gets automatically send some eth balance in the setup phase to pay for gas, so we allow a small error margin here
+        assertApproxEqAbs(ethAfterBalance, address(allocation).balance, 1e15, "User ETH balance is not close enough to contract ETH balance");
+
     }
 
     function test_BalanceAllocationWithHigherUsdc() public {
         vm.startPrank(user);
-        (bool sent, ) = address(allocation).call{value: 1e17}("");
+        (bool sent, ) = address(allocation).call{value: 10 ether}("");
         require(sent, "Failed to send Ether");
 
-        allocation.depositToken(1000e6); //USDC has 6 decimals
-        (uint256 ethBalance, uint256 usdcBalance) = allocation.getMyBalance();
+        allocation.depositToken(1000000e6); //USDC has 6 decimals
 
-        console2.log("Pre-allocation ETH balance in contract: %e", address(allocation).balance);
-        console2.log("Pre-allocation USDC balance in contract: %e", IERC20(token).balanceOf(address(allocation)));
-        (ethBalance, usdcBalance) = allocation.getMyBalance();
-        console2.log("Pre-allocation user's ETH balance in contract: %e", ethBalance);
-        console2.log("Pre-allocation user's USDC balance in contract: %e", usdcBalance);
+        // Get balances before rebalancing
+        (uint256 ethBeforeBalance, uint256 usdcBeforeBalance) = allocation.getMyBalance();
 
         // Run the allocation balancing
         allocation.balanceAllocation(user);
-        (ethBalance, usdcBalance) = allocation.getMyBalance();
-        console2.log("Post-allocation ETH balance in contract: %e", address(allocation).balance);
-        console2.log("Post-allocation USDC balance in contract: %e", IERC20(token).balanceOf(address(allocation)));
-        (ethBalance, usdcBalance) = allocation.getMyBalance();
-        console2.log("Post-allocation user's ETH balance in contract: %e", ethBalance);
-        console2.log("Post-allocation user's USDC balance in contract: %e", usdcBalance);
+
+        // Get balances after rebalancing
+        (uint256 ethAfterBalance, uint256 usdcAfterBalance) = allocation.getMyBalance();
+
         vm.stopPrank();
+
+        assertGt(usdcBeforeBalance, usdcAfterBalance, "USDC balance did not decrease after rebalancing");
+        assertLt(ethBeforeBalance, ethAfterBalance, "ETH balance did not increase after rebalancing");
+        assertEq(usdcAfterBalance, IERC20(token).balanceOf(address(allocation)), "User USDC balance does not match contract USDC balance");
+        // Can improve upon small error margin, but if not that could be considered contract profit?
+        assertApproxEqAbs(ethAfterBalance, address(allocation).balance, 1e15, "User ETH balance is not close enough to contract ETH balance");
+
     }
 
-    // function testFuzz_SetNumber(uint256 x) public {
-    //     allocation.setNumber(x);
-    //     assertEq(allocation.number(), x);
-    // }
 }
