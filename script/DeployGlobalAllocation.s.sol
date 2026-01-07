@@ -14,7 +14,7 @@ contract DeployGlobalAllocation is Script {
     function deployContract() public returns (Allocation) {
         vm.startBroadcast();
         address token = USDC_ADDRESS;
-        GlobalAllocation globalAllocation = new GlobalAllocation(token, 50); //50% ETH to USDC allocation
+        GlobalAllocation globalAllocation = new GlobalAllocation(token, 500000, 40000); //50% ETH to USDC allocation
         vm.stopBroadcast();
 
         return (globalAllocation);
