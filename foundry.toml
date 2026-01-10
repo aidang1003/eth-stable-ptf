@@ -10,4 +10,6 @@ remappings = [
     "@uniswap/v3-per/=lib/v3-periphery/",
     "forge-std/=lib/forge-std/src/",
 ]
+
+MAINNET_RPC_URL = "$MAINNET_RPC_URL"   
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
