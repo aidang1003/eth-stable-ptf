@@ -21,8 +21,7 @@ contract Allocation {
     IUniswapV2Router02 public uniswapV2Router02 = IUniswapV2Router02(UNISWAP_V2_ROUTER02); // Uniswap V2 Router address on Ethereum mainnet
 
     /* Mappings */
-    mapping (address => uint256[2]) private userBalancesEthUsdc; // mapping to store user balances [ethBalance, usdcBalance]
-
+    mapping(address => uint256[2]) private userBalancesEthUsdc; // mapping to store user balances [ethBalance, usdcBalance]
 
     constructor(address _token, uint24 _desiredEthToUsdcAllocationPerccentage) {
         token = _token;
@@ -30,7 +29,9 @@ contract Allocation {
         usdcValueOfEth = 0;
     }
 
-    /** Fund the contract by sending eth or calling depositToken() */
+    /**
+     * Fund the contract by sending eth or calling depositToken()
+     */
     receive() external payable {
         // Send eth to contract to fund
         userBalancesEthUsdc[msg.sender][0] += msg.value;
@@ -44,13 +45,14 @@ contract Allocation {
         for (uint256 i = 0; i < users.length; i++) {
             if (users[i] == msg.sender) {
                 return;
-            } if (i == users.length - 1) {
+            }
+            if (i == users.length - 1) {
                 users.push(msg.sender);
             } else {
                 continue;
             }
         }
-        
+
         bool transferred = IERC20(token).transferFrom(msg.sender, address(this), _amount);
         require(transferred, "Token transfer failed");
         userBalancesEthUsdc[msg.sender][1] += _amount;
@@ -62,24 +64,27 @@ contract Allocation {
         if (userBalancesEthUsdc[_user][0] > 0) {
             (path[0], path[1]) = (WETH_ADDRESS, USDC_ADDRESS);
 
-            uint[] memory amounts = uniswapV2Router02.getAmountsOut(userBalancesEthUsdc[_user][0], path);
+            uint256[] memory amounts = uniswapV2Router02.getAmountsOut(userBalancesEthUsdc[_user][0], path);
             usdcValueOfEth = amounts[1]; // Eth in portfolio represented in USDC
             totalPortfolioValueInUsdc = usdcValueOfEth + userBalancesEthUsdc[_user][1];
-            currentEthToUsdcAllocationPercentage = uint24((usdcValueOfEth * 100) / (usdcValueOfEth + userBalancesEthUsdc[_user][1]));
+            currentEthToUsdcAllocationPercentage =
+                uint24((usdcValueOfEth * 100) / (usdcValueOfEth + userBalancesEthUsdc[_user][1]));
         } else {
             totalPortfolioValueInUsdc = userBalancesEthUsdc[_user][1];
             currentEthToUsdcAllocationPercentage = 0;
         }
-        
+
         console2.log("Current ETH to USDC allocation percentage:", currentEthToUsdcAllocationPercentage);
     }
 
     // Create a function that balance a user's allocation immeditley with a call to the uniswap v2 periphery contract
     function balanceAllocation(address _user) public {
-        require(userBalancesEthUsdc[_user][0] >= 0 || userBalancesEthUsdc[_user][1] >= 0, "Insufficient ETH or USDC balance");
+        require(
+            userBalancesEthUsdc[_user][0] >= 0 || userBalancesEthUsdc[_user][1] >= 0, "Insufficient ETH or USDC balance"
+        );
         // Call function to update current allocation percentage
         updateCurrentAllocationPercentage(_user);
-        
+
         // Make swaps based on current vs desired allocation percentage
         if (currentEthToUsdcAllocationPercentage > desiredEthToUsdcAllocationPerccentage) {
             swapEthToUsdc(_user);
@@ -93,7 +98,8 @@ contract Allocation {
     function swapEthToUsdc(address _user) private {
         // If the user has more ETH than the desired allocation, swap ETH for USDC
         uint256 maxEthToSend = userBalancesEthUsdc[_user][0] * desiredEthToUsdcAllocationPerccentage / 100; //Won't work for all values
-        uint256 minUsdcToRecieve = (usdcValueOfEth * desiredEthToUsdcAllocationPerccentage / 100) - (userBalancesEthUsdc[_user][1] * 100 / totalPortfolioValueInUsdc);
+        uint256 minUsdcToRecieve = (usdcValueOfEth * desiredEthToUsdcAllocationPerccentage / 100)
+            - (userBalancesEthUsdc[_user][1] * 100 / totalPortfolioValueInUsdc);
         console2.log("ETH to swap for USDC: %e", minUsdcToRecieve);
 
         require(minUsdcToRecieve > 0, "No ETH to swap for USDC");
@@ -104,10 +110,7 @@ contract Allocation {
         IERC20(WETH_ADDRESS).approve(address(uniswapV2Router02), minUsdcToRecieve);
 
         returnAmounts = uniswapV2Router02.swapExactETHForTokens{value: maxEthToSend}({
-            amountOutMin: minUsdcToRecieve,
-            path: path,
-            to: address(this),
-            deadline: block.timestamp + 15 minutes
+            amountOutMin: minUsdcToRecieve, path: path, to: address(this), deadline: block.timestamp + 15 minutes
         });
 
         // Update user balances
@@ -117,7 +120,8 @@ contract Allocation {
 
     function swapUsdcToEth(address _user) private {
         // If the user has more USDC than the desired allocation, swap USDC for ETH
-        uint256 usdcToSwap = (desiredEthToUsdcAllocationPerccentage - currentEthToUsdcAllocationPercentage) * userBalancesEthUsdc[_user][1] / 100;
+        uint256 usdcToSwap = (desiredEthToUsdcAllocationPerccentage - currentEthToUsdcAllocationPercentage)
+            * userBalancesEthUsdc[_user][1] / 100;
         console2.log("USDC to swap for ETH: %e", usdcToSwap);
 
         require(usdcToSwap > 0, "No USDC to swap for ETH");
@@ -127,17 +131,17 @@ contract Allocation {
         // Approve Uniswap router to spend USDC
         IERC20(USDC_ADDRESS).approve(address(uniswapV2Router02), usdcToSwap);
 
-        returnAmounts = uniswapV2Router02.swapExactTokensForETH({ 
+        returnAmounts = uniswapV2Router02.swapExactTokensForETH({
             amountIn: usdcToSwap,
             amountOutMin: 0, // Verify this works with 0, then calculate acceptable slippage for real value
             path: path,
             to: address(this),
             deadline: block.timestamp + 15 minutes
-        });  
+        });
 
         // Update user balances
         userBalancesEthUsdc[_user][1] -= returnAmounts[0];
-        userBalancesEthUsdc[_user][0] += returnAmounts[1];   
+        userBalancesEthUsdc[_user][0] += returnAmounts[1];
     }
 
     // Create a function to withdraw tokens
@@ -151,7 +155,9 @@ contract Allocation {
         userBalancesEthUsdc[msg.sender][1] = 0;
 
         // withdraw ETH
-        (bool sent, /* bytes memory data */) = msg.sender.call{value: userBalancesEthUsdc[msg.sender][0]}("");
+        (
+            bool sent, /* bytes memory data */
+        ) = msg.sender.call{value: userBalancesEthUsdc[msg.sender][0]}("");
         require(sent, "Failed to send Ether");
         userBalancesEthUsdc[msg.sender][0] = 0;
     }
@@ -169,6 +175,4 @@ contract Allocation {
         ethBalance = userBalancesEthUsdc[msg.sender][0];
         usdcBalance = userBalancesEthUsdc[msg.sender][1];
     }
-
-
 }

@@ -16,5 +16,5 @@ contract TestDeployGlobalAllocation is Test {
     function test_GetOwner() public {
         GlobalAllocation globalAllocation = deployer.deployContract(user);
         assertEq(globalAllocation.owner(), address(1));
-    }   
+    }
 }

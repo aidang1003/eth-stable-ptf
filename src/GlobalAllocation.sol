@@ -13,9 +13,20 @@ contract GlobalAllocation is Ownable {
 
     IUniswapV2Router02 private immutable uniswapV2Router02;
 
-    constructor(address _token, address _uniswapRouter, uint24 _desiredEthToUsdcAllocationPerccentage, uint24 _rebalancePercentage) Ownable(msg.sender) {
-        require(_desiredEthToUsdcAllocationPerccentage <= 1000000 && _desiredEthToUsdcAllocationPerccentage >= 10000, "Allocation percentage must be between 1.0000% and 100.0000%");
-        require(_rebalancePercentage <= 100000 && _rebalancePercentage >= 1000, "Rebalance percentage must be between 0.1000% and 10.0000%");
+    constructor(
+        address _token,
+        address _uniswapRouter,
+        uint24 _desiredEthToUsdcAllocationPerccentage,
+        uint24 _rebalancePercentage
+    ) Ownable(msg.sender) {
+        require(
+            _desiredEthToUsdcAllocationPerccentage <= 1000000 && _desiredEthToUsdcAllocationPerccentage >= 10000,
+            "Allocation percentage must be between 1.0000% and 100.0000%"
+        );
+        require(
+            _rebalancePercentage <= 100000 && _rebalancePercentage >= 1000,
+            "Rebalance percentage must be between 0.1000% and 10.0000%"
+        );
 
         token = _token;
         uniswapV2Router02 = IUniswapV2Router02(_uniswapRouter);
@@ -28,7 +39,7 @@ contract GlobalAllocation is Ownable {
      */
     function updateCurrentAllocationPercentage() public {
         // Placeholder function to update current allocation percentage
-        // Either make an overload or a variable to specify a balancing after 
+        // Either make an overload or a variable to specify a balancing after
         // depositing funds that uses chainlink oracle for a more accurate quote price
     }
 
@@ -111,7 +122,7 @@ contract GlobalAllocation is Ownable {
 
     function withdraw() external onlyOwner {
         require(cancelLimits(), "Failed to cancel existing limits");
-        (bool success, ) = msg.sender.call{value: address(this).balance}("");
+        (bool success,) = msg.sender.call{value: address(this).balance}("");
         require(success, "Transfer failed");
     }
 }

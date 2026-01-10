@@ -6,7 +6,6 @@ import {GlobalAllocation} from "src/GlobalAllocation.sol";
 import {USDC_ADDRESS, UNISWAP_V2_ROUTER02} from "src/Constants.sol";
 
 contract DeployGlobalAllocation is Script {
-
     function run() public {
         deployContract(msg.sender);
     }
@@ -19,6 +18,5 @@ contract DeployGlobalAllocation is Script {
         } else {
             revert("Unsupported chain");
         }
-
     }
 }
