@@ -28,6 +28,8 @@ contract GlobalAllocation is Ownable {
      */
     function updateCurrentAllocationPercentage() public {
         // Placeholder function to update current allocation percentage
+        // Either make an overload or a variable to specify a balancing after 
+        // depositing funds that uses chainlink oracle for a more accurate quote price
     }
 
     /**
