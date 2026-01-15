@@ -10,9 +10,9 @@ contract GlobalAllocation is Ownable {
     uint24 public currentEthToUsdcAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
     uint24 public immutable rebalancePercentage; // percentage of the portfolio to rebalance at a time
 
-    /* Immutable Global Variables */
-    address public immutable i_token1; // Specify token1 address (ETH)
-    address public immutable i_token2; // Specify token2 address (USDT)
+    /* State Variables */
+    address private immutable i_token1; // Specify token1 address (ETH)
+    address private immutable i_token2; // Specify token2 address (USDT)
     address[] private s_Token1ToToken2Path;
     address[] private s_Token2ToToken1Path;
     uint256[] private returnAmounts = new uint256[](2);
@@ -77,8 +77,6 @@ contract GlobalAllocation is Ownable {
             return;
         }
 
-        // Create limits after rebalancing so contract doesn't get into an idle state
-        createLimits();
     }
 
     /**
@@ -89,7 +87,10 @@ contract GlobalAllocation is Ownable {
         uint256 minUsdcToRecieve = (returnAmounts[1] * (1000000 - rebalancePercentage)) / 1000000;
 
         returnAmounts = uniswapV2Router02.swapExactETHForTokens{value: maxEthToSend}({
-            amountOutMin: minUsdcToRecieve, path: s_Token1ToToken2Path, to: address(this), deadline: block.timestamp + 15 minutes
+            amountOutMin: minUsdcToRecieve,
+            path: s_Token1ToToken2Path,
+            to: address(this),
+            deadline: block.timestamp + 15 minutes
         });
     }
 
@@ -100,30 +101,6 @@ contract GlobalAllocation is Ownable {
         // Place holder swap code
     }
 
-    /**
-     * @dev Creates a limit order at the current price +- the rebalance percentage
-     */
-    function createLimits() internal {
-        // Create limit for +rebalance percentage
-        // Create limit for -rebalance percentage
-    }
-
-    /**
-     * @dev Cancels existing limit orders
-     * Called by contract owner to pause rebalancing
-     */
-    function cancelLimitsExternal() external onlyOwner returns (bool success) {
-        // Place holder cancel limits code
-        success = cancelLimits();
-    }
-
-    /**
-     * @dev Called by withdraw function to cancel limits before withdrawing funds
-     */
-    function cancelLimits() internal returns (bool success) {
-        // Place holder cancel limits code
-        success = true;
-    }
 
     /**
      * @dev Accept ETH deposits
@@ -136,7 +113,6 @@ contract GlobalAllocation is Ownable {
     }
 
     function withdraw() external onlyOwner {
-        require(cancelLimits(), "Failed to cancel existing limits");
         (bool success,) = msg.sender.call{value: address(this).balance}("");
         require(success, "Transfer failed");
     }
