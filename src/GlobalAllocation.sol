@@ -6,15 +6,22 @@ import {UNISWAP_V2_ROUTER02} from "./Constants.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 contract GlobalAllocation is Ownable {
-    address public immutable token; // Specify token to perform allocation on
     uint24 public immutable desiredEthToUsdcAllocationPerccentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
     uint24 public currentEthToUsdcAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
     uint24 public immutable rebalancePercentage; // percentage of the portfolio to rebalance at a time
 
+    /* Immutable Global Variables */
+    address public immutable i_token1; // Specify token1 address (ETH)
+    address public immutable i_token2; // Specify token2 address (USDT)
+    address[] private s_Token1ToToken2Path;
+    address[] private s_Token2ToToken1Path;
+    uint256[] private returnAmounts = new uint256[](2);
+
     IUniswapV2Router02 private immutable uniswapV2Router02;
 
     constructor(
-        address _token,
+        address _token1,
+        address _token2,
         address _uniswapRouter,
         uint24 _desiredEthToUsdcAllocationPerccentage,
         uint24 _rebalancePercentage
@@ -28,7 +35,10 @@ contract GlobalAllocation is Ownable {
             "Rebalance percentage must be between 0.1000% and 10.0000%"
         );
 
-        token = _token;
+        i_token1 = _token1;
+        i_token2 = _token2;
+        s_Token1ToToken2Path = [i_token1, i_token2];
+        s_Token2ToToken1Path = [i_token2, i_token1];
         uniswapV2Router02 = IUniswapV2Router02(_uniswapRouter);
         desiredEthToUsdcAllocationPerccentage = _desiredEthToUsdcAllocationPerccentage;
         rebalancePercentage = _rebalancePercentage;
@@ -75,7 +85,12 @@ contract GlobalAllocation is Ownable {
      * @dev Swaps ETH for token address using Uniswap
      */
     function swapEthForToken() internal {
-        // Place holder swap code
+        uint256 maxEthToSend = (address(this).balance * rebalancePercentage) / 1000000;
+        uint256 minUsdcToRecieve = (returnAmounts[1] * (1000000 - rebalancePercentage)) / 1000000;
+
+        returnAmounts = uniswapV2Router02.swapExactETHForTokens{value: maxEthToSend}({
+            amountOutMin: minUsdcToRecieve, path: s_Token1ToToken2Path, to: address(this), deadline: block.timestamp + 15 minutes
+        });
     }
 
     /**
