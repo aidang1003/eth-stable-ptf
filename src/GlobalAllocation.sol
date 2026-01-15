@@ -76,7 +76,6 @@ contract GlobalAllocation is Ownable {
         } else {
             return;
         }
-
     }
 
     /**
@@ -100,7 +99,6 @@ contract GlobalAllocation is Ownable {
     function swapTokenForEth() internal {
         // Place holder swap code
     }
-
 
     /**
      * @dev Accept ETH deposits
