@@ -126,7 +126,7 @@ contract GlobalAllocation is Ownable {
     receive() external payable {
         // Accept ETH deposits
         require(msg.value > 0, "Must send ETH to deposit");
-        balanceFunds();
+        // balanceFunds();
     }
 
     function withdraw() external onlyOwner {

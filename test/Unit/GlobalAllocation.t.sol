@@ -16,13 +16,38 @@ contract GlobalAllocationTest is Test {
     address public user = address(1);
 
     function setUp() public {
-        globalAllocation = new GlobalAllocation(WETH_ADDRESS, USDC_ADDRESS, UNISWAP_V2_ROUTER02, 500000, 40000); //50% ETH to USDC allocation, 4% rebalance percentage
         vm.deal(user, 2 ether);
 
         // Approve this contract to spend user's USDC
         vm.startPrank(user);
 
+        // Deploy contract as user
+        globalAllocation = new GlobalAllocation(WETH_ADDRESS, USDC_ADDRESS, UNISWAP_V2_ROUTER02, 500000, 40000); //50% ETH to USDC allocation, 4% rebalance percentage
+
         IERC20(token2).approve(address(globalAllocation), type(uint256).max); // USDC has 6 decimals
+        vm.stopPrank();
+    }
+
+    function testDeposit() public {
+        vm.startPrank(user);
+
+        uint256 depositAmount = 1 ether;
+        uint256 initialBalance = address(globalAllocation).balance;
+
+        // Deposit ETH to the contract
+        (bool success,) = address(globalAllocation).call{value: depositAmount}("");
+        require(success, "Deposit failed");
+
+        console2.log("Initial balance:", initialBalance);
+        console2.log("Contract balance:", address(globalAllocation).balance);
+
+        // Verify the contract received the ETH
+        assertEq(
+            address(globalAllocation).balance,
+            initialBalance + depositAmount,
+            "Contract balance should increase by deposit amount"
+        );
+
         vm.stopPrank();
     }
 }
