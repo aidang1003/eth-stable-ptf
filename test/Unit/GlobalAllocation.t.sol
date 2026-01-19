@@ -38,9 +38,6 @@ contract GlobalAllocationTest is Test {
         (bool success,) = address(globalAllocation).call{value: depositAmount}("");
         require(success, "Deposit failed");
 
-        console2.log("Initial balance:", initialBalance);
-        console2.log("Contract balance:", address(globalAllocation).balance);
-
         // Verify the contract received the ETH
         assertEq(
             address(globalAllocation).balance,
