@@ -134,5 +134,6 @@ contract GlobalAllocation is Ownable {
     function withdraw() external onlyOwner {
         (bool success,) = msg.sender.call{value: address(this).balance}("");
         require(success, "Transfer failed");
+        // Add a way to withdraw the token
     }
 }
