@@ -7,7 +7,7 @@ import {UNISWAP_V2_ROUTER02} from "./Constants.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 contract GlobalAllocation is Ownable {
-    uint24 public desiredEthToUsdcAllocationPerccentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
+    uint24 public desiredEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
     uint24 public currentEthToUsdcAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
     uint24 public immutable rebalancePercentage; // percentage of the portfolio to rebalance at a time
 
@@ -24,11 +24,11 @@ contract GlobalAllocation is Ownable {
         address _token1,
         address _token2,
         address _uniswapRouter,
-        uint24 _desiredEthToUsdcAllocationPerccentage,
+        uint24 _desiredEthToTokenAllocationPercentage,
         uint24 _rebalancePercentage
     ) Ownable(msg.sender) {
         require(
-            _desiredEthToUsdcAllocationPerccentage <= 1000000 && _desiredEthToUsdcAllocationPerccentage >= 10000,
+            _desiredEthToTokenAllocationPercentage <= 1000000 && _desiredEthToTokenAllocationPercentage >= 10000,
             "Allocation percentage must be between 1.0000% and 100.0000%"
         );
         require(
@@ -41,7 +41,7 @@ contract GlobalAllocation is Ownable {
         s_Token1ToToken2Path = [i_token1, i_token2];
         s_Token2ToToken1Path = [i_token2, i_token1];
         uniswapV2Router02 = IUniswapV2Router02(_uniswapRouter);
-        desiredEthToUsdcAllocationPerccentage = _desiredEthToUsdcAllocationPerccentage;
+        desiredEthToTokenAllocationPercentage = _desiredEthToTokenAllocationPercentage;
         rebalancePercentage = _rebalancePercentage;
     }
 
@@ -52,6 +52,9 @@ contract GlobalAllocation is Ownable {
         // Placeholder function to update current allocation percentage
         // Either make an overload or a variable to specify a balancing after
         // depositing funds that uses chainlink oracle for a more accurate quote price
+        if (IERC20(i_token2).balanceOf(address(this)) == 0) {
+            currentEthToUsdcAllocationPercentage = 1000000; // %100
+        }
     }
 
     /**
@@ -70,9 +73,9 @@ contract GlobalAllocation is Ownable {
         updateCurrentAllocationPercentage();
 
         // Logic for balancing funds
-        if (currentEthToUsdcAllocationPercentage < desiredEthToUsdcAllocationPerccentage) {
+        if (currentEthToUsdcAllocationPercentage < desiredEthToTokenAllocationPercentage) {
             swapTokenForEth();
-        } else if (currentEthToUsdcAllocationPercentage > desiredEthToUsdcAllocationPerccentage) {
+        } else if (currentEthToUsdcAllocationPercentage > desiredEthToTokenAllocationPercentage) {
             swapEthForToken();
         } else {
             return;
@@ -100,10 +103,10 @@ contract GlobalAllocation is Ownable {
      */
     function swapTokenForEth() internal {
         require(
-            desiredEthToUsdcAllocationPerccentage > currentEthToUsdcAllocationPercentage,
+            desiredEthToTokenAllocationPercentage > currentEthToUsdcAllocationPercentage,
             "Desired Eth allocation less than current Eth allocation"
         );
-        uint256 maxTokenToSend = (desiredEthToUsdcAllocationPerccentage - currentEthToUsdcAllocationPercentage)
+        uint256 maxTokenToSend = (desiredEthToTokenAllocationPercentage - currentEthToUsdcAllocationPercentage)
             * IERC20(i_token2).balanceOf(address(this)) / 100000;
         // uint256 minEthToRecieve = ;
 
@@ -126,7 +129,6 @@ contract GlobalAllocation is Ownable {
     receive() external payable {
         // Accept ETH deposits
         require(msg.value > 0, "Must send ETH to deposit");
-        // balanceFunds();
     }
 
     function withdraw() external onlyOwner {
