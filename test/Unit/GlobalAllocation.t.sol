@@ -47,4 +47,30 @@ contract GlobalAllocationTest is Test {
 
         vm.stopPrank();
     }
+
+    function testWithdraw() public {
+        vm.startPrank(user);
+
+        // First deposit some ETH to the contract
+        uint256 depositAmount = 1 ether;
+        (bool depositSuccess,) = address(globalAllocation).call{value: depositAmount}("");
+        require(depositSuccess, "Deposit failed");
+
+        // Record balances before withdrawal
+        uint256 contractBalanceBefore = address(globalAllocation).balance;
+        uint256 userBalanceBefore = user.balance;
+
+        // Withdraw all funds from the contract
+        globalAllocation.withdraw();
+
+        // Verify the contract balance is now 0
+        assertEq(address(globalAllocation).balance, 0, "Contract balance should be 0 after withdrawal");
+
+        // Verify user received the withdrawn funds
+        assertEq(
+            user.balance, userBalanceBefore + contractBalanceBefore, "User balance should increase by withdrawn amount"
+        );
+
+        vm.stopPrank();
+    }
 }
