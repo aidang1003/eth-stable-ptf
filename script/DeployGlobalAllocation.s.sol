@@ -13,7 +13,7 @@ contract DeployGlobalAllocation is Script {
     function deployContract(address _deployer) public returns (GlobalAllocation globalAllocation) {
         if (block.chainid == 1) {
             vm.startBroadcast(_deployer);
-            globalAllocation = new GlobalAllocation(WETH_ADDRESS, USDC_ADDRESS, UNISWAP_V2_ROUTER02, 500000, 40000); //50% ETH to USDC allocation
+            globalAllocation = new GlobalAllocation(WETH_ADDRESS, USDC_ADDRESS, UNISWAP_V2_ROUTER02, 500000, 40000); //50% ETH to USDC allocation, 4% rebalance percentage
             vm.stopBroadcast();
         } else {
             revert("Unsupported chain");
