@@ -2,11 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {UNISWAP_V2_ROUTER02} from "./Constants.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 contract GlobalAllocation is Ownable {
-    uint24 public immutable desiredEthToUsdcAllocationPerccentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
+    uint24 public desiredEthToUsdcAllocationPerccentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
     uint24 public currentEthToUsdcAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
     uint24 public immutable rebalancePercentage; // percentage of the portfolio to rebalance at a time
 
@@ -82,11 +83,12 @@ contract GlobalAllocation is Ownable {
      * @dev Swaps ETH for token address using Uniswap
      */
     function swapEthForToken() internal {
+        // Fix the math here
         uint256 maxEthToSend = (address(this).balance * rebalancePercentage) / 1000000;
-        uint256 minUsdcToRecieve = (returnAmounts[1] * (1000000 - rebalancePercentage)) / 1000000;
+        uint256 minTokenToRecieve = (returnAmounts[1] * (1000000 - rebalancePercentage)) / 1000000;
 
         returnAmounts = uniswapV2Router02.swapExactETHForTokens{value: maxEthToSend}({
-            amountOutMin: minUsdcToRecieve,
+            amountOutMin: minTokenToRecieve,
             path: s_Token1ToToken2Path,
             to: address(this),
             deadline: block.timestamp + 15 minutes
@@ -97,7 +99,24 @@ contract GlobalAllocation is Ownable {
      * @dev Swaps token for ETH using Uniswap
      */
     function swapTokenForEth() internal {
-        // Place holder swap code
+        require(
+            desiredEthToUsdcAllocationPerccentage > currentEthToUsdcAllocationPercentage,
+            "Desired Eth allocation less than current Eth allocation"
+        );
+        uint256 maxTokenToSend = (desiredEthToUsdcAllocationPerccentage - currentEthToUsdcAllocationPercentage)
+            * IERC20(i_token2).balanceOf(address(this)) / 100000;
+        // uint256 minEthToRecieve = ;
+
+        // Approve Uniswap router to spend USDC
+        IERC20(i_token2).approve(address(uniswapV2Router02), maxTokenToSend);
+
+        returnAmounts = uniswapV2Router02.swapExactTokensForETH({
+            amountIn: maxTokenToSend,
+            amountOutMin: 0, // Verify this works with 0, then calculate acceptable slippage for real value
+            path: s_Token2ToToken1Path,
+            to: address(this),
+            deadline: block.timestamp + 15 minutes
+        });
     }
 
     /**
