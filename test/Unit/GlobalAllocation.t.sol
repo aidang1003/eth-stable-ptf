@@ -73,4 +73,44 @@ contract GlobalAllocationTest is Test {
 
         vm.stopPrank();
     }
+
+    function testSwapEthForToken() public {
+        vm.startPrank(user);
+
+        // Deposit ETH to the contract
+        uint256 depositAmount = 1 ether;
+        (bool success,) = address(globalAllocation).call{value: depositAmount}("");
+        require(success, "Deposit failed");
+
+        // Record balances before swap
+        uint256 ethBalanceBefore = address(globalAllocation).balance;
+        uint256 usdcBalanceBefore = token2.balanceOf(address(globalAllocation));
+
+        // Calculate expected ETH to swap (rebalancePercentage is 4%)
+        uint256 expectedEthToSwap = (ethBalanceBefore * 40000) / 1000000;
+
+        // Trigger the swap by calling balanceFundsExternal
+        // This will call swapEthForToken since all funds are in ETH (currentAllocation > desiredAllocation)
+        globalAllocation.balanceFundsExternal();
+
+        // Get balances after swap
+        uint256 ethBalanceAfter = address(globalAllocation).balance;
+        uint256 usdcBalanceAfter = token2.balanceOf(address(globalAllocation));
+
+        // Verify ETH balance decreased
+        assertLt(ethBalanceAfter, ethBalanceBefore, "ETH balance should decrease after swap");
+
+        // Verify USDC balance increased
+        assertGt(usdcBalanceAfter, usdcBalanceBefore, "USDC balance should increase after swap");
+
+        // Verify approximately the right amount of ETH was swapped
+        assertApproxEqAbs(
+            ethBalanceBefore - ethBalanceAfter,
+            expectedEthToSwap,
+            0.01 ether,
+            "Should swap approximately rebalancePercentage of ETH"
+        );
+
+        vm.stopPrank();
+    }
 }
