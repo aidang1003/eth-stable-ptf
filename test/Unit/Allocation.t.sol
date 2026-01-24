@@ -30,6 +30,7 @@ contract AllocationTest is Test {
 
         // Check balance after sending Ether
         (uint256 ethBalance,) = allocation.getMyBalance();
+        console2.log("Eth Balance", ethBalance);
 
         assertEq(ethBalance, 1e18);
         // assertEq(ethBalance, address(allocation).balance, "Contract ETH does not match user ETH balance");

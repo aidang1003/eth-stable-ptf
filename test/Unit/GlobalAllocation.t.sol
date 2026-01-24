@@ -85,6 +85,7 @@ contract GlobalAllocationTest is Test {
         // Record balances before swap
         uint256 ethBalanceBefore = address(globalAllocation).balance;
         uint256 usdcBalanceBefore = token2.balanceOf(address(globalAllocation));
+        console2.log("Eth Balance ethBefore", ethBalanceBefore);
 
         // Calculate expected ETH to swap (rebalancePercentage is 4%)
         uint256 expectedEthToSwap = (ethBalanceBefore * 40000) / 1000000;
