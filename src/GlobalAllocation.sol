@@ -10,11 +10,20 @@ contract GlobalAllocation is Ownable {
     uint24 public currentEthToUsdcAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
     uint24 public immutable rebalancePercentage; // percentage of the portfolio to rebalance at a time
 
+    /* Type Declarations */
+    enum AllocationState {
+        BALANCED,
+        POST_DEPOSIT
+    }
+
     /* State Variables */
     address private immutable i_token1; // Specify token1 address (ETH)
     address private immutable i_token2; // Specify token2 address (USDT)
+
     address[] private s_Token1ToToken2Path;
     address[] private s_Token2ToToken1Path;
+    AllocationState private s_allocationState;
+
     uint256[] private returnAmounts = new uint256[](2);
 
     IUniswapV2Router02 private immutable uniswapV2Router02;
@@ -126,8 +135,10 @@ contract GlobalAllocation is Ownable {
      * Intentianally do not allow deposits of other tokens, only ETH
      */
     receive() external payable {
-        // Accept ETH deposits
         require(msg.value > 0, "Must send ETH to deposit");
+
+        // Setting post deposit state so the next re-balance uses Chainlink price feed instead of Uniswap quote
+        s_allocationState = AllocationState.POST_DEPOSIT;
     }
 
     function withdraw() external onlyOwner {
