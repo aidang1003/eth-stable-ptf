@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 contract GlobalAllocation is Ownable {
     uint24 public desiredEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
@@ -21,6 +22,7 @@ contract GlobalAllocation is Ownable {
     /* State Variables */
     address private immutable I_TOKEN1; // Specify token1 address (ETH)
     address private immutable I_TOKEN2; // Specify token2 address (USDT)
+    AggregatorV3Interface private immutable I_CHAINLINK_PRICE_FEED; // ETH/Token2 price feed
 
     uint256 private sTotalPortfolioValueInToken2;
     uint256 private sEthValueInToken2;
@@ -34,6 +36,7 @@ contract GlobalAllocation is Ownable {
         address _token1,
         address _token2,
         address _uniswapRouter,
+        address _chainlinkPriceFeed,
         uint24 _desiredEthToTokenAllocationPercentage,
         uint24 _rebalancePercentage
     ) Ownable(msg.sender) {
@@ -48,6 +51,7 @@ contract GlobalAllocation is Ownable {
 
         I_TOKEN1 = _token1;
         I_TOKEN2 = _token2;
+        I_CHAINLINK_PRICE_FEED = AggregatorV3Interface(_chainlinkPriceFeed);
         sToken1ToToken2Path = [I_TOKEN1, I_TOKEN2];
         sToken2ToToken1Path = [I_TOKEN2, I_TOKEN1];
         I_UNISWAP_V2_ROUTER_02 = IUniswapV2Router02(_uniswapRouter);
@@ -61,14 +65,16 @@ contract GlobalAllocation is Ownable {
      * Otherwise use a Uniswap quote to get ETH value in token2 terms
      */
     function quoteEthPriceInToken2() public {
-        // Placeholder function to update current allocation percentage
-        // Either make an overload or a variable to specify a balancing after
-        // depositing funds that uses chainlink oracle for a more accurate quote price
         if (sAllocationState == AllocationState.AFTER_DEPOSIT) {
-            // Use Chainlink price feed to get ETH price in USD
+            // Use Chainlink price feed to get ETH price in Token2
+            (, int256 price,,,) = I_CHAINLINK_PRICE_FEED.latestRoundData();
+            require(price > 0, "Invalid price from oracle");
 
-            sEthValueInToken2 = 100;
-            sAllocationState = AllocationState.BALANCED;
+            // Get the number of decimals from the price feed
+            uint8 decimals = I_CHAINLINK_PRICE_FEED.decimals();
+
+            // Calculate ETH value in Token2 terms: (ETH balance * price) / (10 ** decimals)
+            sEthValueInToken2 = (address(this).balance * uint256(price)) / (10 ** decimals);
         } else {
             uint256[] memory returnAmounts =
                 I_UNISWAP_V2_ROUTER_02.getAmountsOut(address(this).balance, sToken1ToToken2Path);
