@@ -25,10 +25,12 @@ contract GlobalAllocation is Ownable {
     address private immutable I_TOKEN1; // Specify token1 address (ETH)
     address private immutable I_TOKEN2; // Specify token2 address (USDT)
     AggregatorV3Interface private immutable I_CHAINLINK_PRICE_FEED; // ETH/Token2 price feed
+    uint8 private I_Token2Decimals;
+    uint8 private I_ChainlinkToken2Decimals;
 
     uint256 private sTotalPortfolioValueInToken2;
-    uint256 private sEthPriceInToken2; // Value of 1 Ether in terms of token2
-    uint8 private sToken2Decimals;
+    uint256 private sEthPriceInToken2; // Value of 1 Ether in terms of token2 according to Uniswap quote
+    uint256 private sChainlinkEthPriceInToken2; // Value of 1 Ether in terms of token2 according to Chainlink
     address[] private sToken1ToToken2Path;
     address[] private sToken2ToToken1Path;
     AllocationState private sAllocationState;
@@ -60,27 +62,27 @@ contract GlobalAllocation is Ownable {
         sToken2ToToken1Path = [I_TOKEN2, I_TOKEN1];
         desiredEthToTokenAllocationPercentage = _desiredEthToTokenAllocationPercentage;
         rebalancePercentage = _rebalancePercentage;
-        sToken2Decimals = IERC20Metadata(I_TOKEN2).decimals();
+        I_Token2Decimals = IERC20Metadata(I_TOKEN2).decimals();
+        I_ChainlinkToken2Decimals = I_CHAINLINK_PRICE_FEED.decimals();
     }
 
     /**
      * @dev Updates the current allocation percentage based on Uniswap quoted Eth price
-     * If immediatley after deposit use ChainLink Priceffeed to get ETH value in token2 terms
-     * Otherwise use a Uniswap quote to get ETH value in token2 terms
+     * If immediatley after deposit use ChainLink Pricefeed to get ETH value in token2 terms
+     * The Chainlink value is to ensure that the Uniswap price quote is reasonable when performing a larger transaction
+     * Use a Uniswap quote to get ETH value in token2 terms
      */
     function quoteEthPriceInToken2() public {
         if (sAllocationState == AllocationState.AFTER_ETH_QUOTE) {
             // Use Chainlink price feed to get ETH price in Token2
             (, int256 price,,,) = I_CHAINLINK_PRICE_FEED.latestRoundData();
             require(price > 0, "Invalid price from oracle");
-            sEthPriceInToken2 = uint256(price);
-
-            sToken2Decimals = I_CHAINLINK_PRICE_FEED.decimals();
-        } else {
-            uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.getAmountsOut(1 ether, sToken1ToToken2Path);
-            sEthPriceInToken2 = returnAmounts[1]; // returnAmount[1] is a quote for 1 Ether in terms of token2
-            console2.log("Eth price in token 2 Uni quote:", sEthPriceInToken2);
+            sChainlinkEthPriceInToken2 = uint256(price); // Use this value to ensure that the Uniswap quote is reasonabnle for large transactions
         }
+
+        uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.getAmountsOut(1 ether, sToken1ToToken2Path);
+        sEthPriceInToken2 = returnAmounts[1]; // returnAmount[1] is a quote for 1 Ether in terms of token2
+        console2.log("Eth price in token 2 Uni quote:", sEthPriceInToken2);
 
         // Update state
         sAllocationState = AllocationState.AFTER_ETH_QUOTE;
@@ -143,10 +145,10 @@ contract GlobalAllocation is Ownable {
      */
     function swapEthForToken() internal {
         uint256 minTokenToRecieve = (currentEthToTokenAllocationPercentage - desiredEthToTokenAllocationPercentage)
-            * sTotalPortfolioValueInToken2 / 1000000 / (10 ** sToken2Decimals);
+            * sTotalPortfolioValueInToken2 / 1000000 / (10 ** I_Token2Decimals);
 
         // Use quoted price to send the max eth required for transaction to go through
-        uint256 maxEthToSend = minTokenToRecieve / sEthPriceInToken2 / (10 ** sToken2Decimals);
+        uint256 maxEthToSend = minTokenToRecieve / sEthPriceInToken2 / (10 ** I_Token2Decimals);
 
         console2.log("Price Feed decimals", I_CHAINLINK_PRICE_FEED.decimals());
         // console2.log(
