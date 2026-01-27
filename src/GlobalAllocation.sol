@@ -51,10 +51,10 @@ contract GlobalAllocation is Ownable {
 
         I_TOKEN1 = _token1;
         I_TOKEN2 = _token2;
+        I_UNISWAP_V2_ROUTER_02 = IUniswapV2Router02(_uniswapRouter);
         I_CHAINLINK_PRICE_FEED = AggregatorV3Interface(_chainlinkPriceFeed);
         sToken1ToToken2Path = [I_TOKEN1, I_TOKEN2];
         sToken2ToToken1Path = [I_TOKEN2, I_TOKEN1];
-        I_UNISWAP_V2_ROUTER_02 = IUniswapV2Router02(_uniswapRouter);
         desiredEthToTokenAllocationPercentage = _desiredEthToTokenAllocationPercentage;
         rebalancePercentage = _rebalancePercentage;
     }
@@ -187,7 +187,9 @@ contract GlobalAllocation is Ownable {
 
     function withdraw() external onlyOwner {
         (bool success,) = msg.sender.call{value: address(this).balance}("");
-        require(success, "Transfer failed");
-        // Add a way to withdraw the token
+        require(success, "Eth withdraw failed");
+
+        success = IERC20(I_TOKEN2).transfer(msg.sender, IERC20(I_TOKEN2).balanceOf(address(this)));
+        require(success, "Token withdraw failed");
     }
 }
