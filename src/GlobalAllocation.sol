@@ -127,7 +127,7 @@ contract GlobalAllocation is Ownable {
      */
     function swapEthForToken() internal {
         uint256 minTokenToRecieve = (currentEthToTokenAllocationPercentage - desiredEthToTokenAllocationPercentage)
-            * sTotalPortfolioValueInToken2 / 1e6;
+            * sTotalPortfolioValueInToken2 / (1 ** I_Token2Decimals);
 
         // Use quoted price to send the max eth required for transaction to go through
         uint256 maxEthToSend = (minTokenToRecieve * 1e18) / sEthPriceInToken2;
@@ -145,7 +145,7 @@ contract GlobalAllocation is Ownable {
      */
     function swapTokenForEth() internal {
         uint256 maxTokenToSend = (desiredEthToTokenAllocationPercentage - currentEthToTokenAllocationPercentage)
-            * sTotalPortfolioValueInToken2 / 100000;
+            * sTotalPortfolioValueInToken2 / (1 ** I_Token2Decimals);
         uint256 minEthToRecieve = maxTokenToSend / sEthPriceInToken2;
 
         // Approve Uniswap router to spend USDC
