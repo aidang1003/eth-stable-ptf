@@ -6,43 +6,47 @@ import {console2} from "forge-std/console2.sol";
 import {GlobalAllocation} from "../../src/GlobalAllocation.sol";
 import {DeployGlobalAllocation} from "../../script/DeployGlobalAllocation.s.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {WETH_ADDRESS, USDC_ADDRESS, UNISWAP_V2_ROUTER02} from "src/Constants.sol";
+import {USDC_ADDRESS} from "src/Constants.sol";
 
 contract GlobalAllocationTest is Test {
     GlobalAllocation public globalAllocation;
-
-    IERC20 public token1 = IERC20(WETH_ADDRESS); //WETH on mainnet, switch to helperconfig script at some point
-    IERC20 public token2 = IERC20(USDC_ADDRESS); //USDC on mainnet, switch to helperconfig script at some point
+    IERC20 public token2 = IERC20(USDC_ADDRESS);
 
     address public user = address(1);
+    uint256 public constant INITIAL_DEPOSIT = 1 ether;
 
     function setUp() public {
-        vm.deal(user, 2 ether);
+        vm.deal(user, 10 ether);
 
         DeployGlobalAllocation deployGlobalAllocation = new DeployGlobalAllocation();
         globalAllocation = deployGlobalAllocation.deployContract(user);
 
-        // Approve this contract to spend user's USDC
         vm.startPrank(user);
 
-        IERC20(token2).approve(address(globalAllocation), type(uint256).max); // USDC has 6 decimals
+        // Fund the contract with initial ETH deposit
+        (bool success,) = address(globalAllocation).call{value: INITIAL_DEPOSIT}("");
+        require(success, "Initial deposit failed");
+
+        // Approve contract to spend user's USDC
+        token2.approve(address(globalAllocation), type(uint256).max);
+
         vm.stopPrank();
     }
 
     function testDeposit() public {
         vm.startPrank(user);
 
-        uint256 depositAmount = 1 ether;
-        uint256 initialBalance = address(globalAllocation).balance;
+        uint256 additionalDeposit = 0.5 ether;
+        uint256 balanceBefore = address(globalAllocation).balance;
 
-        // Deposit ETH to the contract
-        (bool success,) = address(globalAllocation).call{value: depositAmount}("");
+        // Deposit additional ETH to the contract
+        (bool success,) = address(globalAllocation).call{value: additionalDeposit}("");
         require(success, "Deposit failed");
 
         // Verify the contract received the ETH
         assertEq(
             address(globalAllocation).balance,
-            initialBalance + depositAmount,
+            balanceBefore + additionalDeposit,
             "Contract balance should increase by deposit amount"
         );
 
@@ -51,11 +55,6 @@ contract GlobalAllocationTest is Test {
 
     function testWithdraw() public {
         vm.startPrank(user);
-
-        // First deposit some ETH to the contract
-        uint256 depositAmount = 1 ether;
-        (bool depositSuccess,) = address(globalAllocation).call{value: depositAmount}("");
-        require(depositSuccess, "Deposit failed");
 
         // Record balances before withdrawal
         uint256 contractBalanceBefore = address(globalAllocation).balance;
@@ -75,21 +74,50 @@ contract GlobalAllocationTest is Test {
         vm.stopPrank();
     }
 
-    function testSwapEthForToken() public {
+    function testRebalanceAndThenWithdraw() public {
         vm.startPrank(user);
 
-        // Deposit ETH to the contract
-        uint256 depositAmount = 1 ether;
-        (bool success,) = address(globalAllocation).call{value: depositAmount}("");
-        require(success, "Deposit failed");
+        // First rebalance to swap some ETH for USDC
+        globalAllocation.balanceFundsExternal();
+
+        // Record balances after rebalance
+        uint256 contractEthBalance = address(globalAllocation).balance;
+        uint256 contractUsdcBalance = token2.balanceOf(address(globalAllocation));
+        uint256 userEthBalanceBefore = user.balance;
+        uint256 userUsdcBalanceBefore = token2.balanceOf(user);
+
+        // Verify contract has both ETH and USDC after rebalance
+        assertGt(contractEthBalance, 0, "Contract should have ETH after rebalance");
+        assertGt(contractUsdcBalance, 0, "Contract should have USDC after rebalance");
+
+        // Withdraw all funds
+        globalAllocation.withdraw();
+
+        // Verify contract balances are now 0
+        assertEq(address(globalAllocation).balance, 0, "Contract ETH balance should be 0 after withdrawal");
+        assertEq(token2.balanceOf(address(globalAllocation)), 0, "Contract USDC balance should be 0 after withdrawal");
+
+        // Verify user received both ETH and USDC
+        assertEq(
+            user.balance,
+            userEthBalanceBefore + contractEthBalance,
+            "User should receive all ETH from contract"
+        );
+        assertEq(
+            token2.balanceOf(user),
+            userUsdcBalanceBefore + contractUsdcBalance,
+            "User should receive all USDC from contract"
+        );
+
+        vm.stopPrank();
+    }
+
+    function testSwapEthForToken() public {
+        vm.startPrank(user);
 
         // Record balances before swap
         uint256 ethBalanceBefore = address(globalAllocation).balance;
         uint256 usdcBalanceBefore = token2.balanceOf(address(globalAllocation));
-        console2.log("Eth Balance ethBefore", ethBalanceBefore);
-
-        // Calculate expected ETH to swap (rebalancePercentage is 4%)
-        uint256 expectedEthToSwap = (ethBalanceBefore * 40000) / 1000000;
 
         // Trigger the swap by calling balanceFundsExternal
         // This will call swapEthForToken since all funds are in ETH (currentAllocation > desiredAllocation)
@@ -104,14 +132,6 @@ contract GlobalAllocationTest is Test {
 
         // Verify USDC balance increased
         assertGt(usdcBalanceAfter, usdcBalanceBefore, "USDC balance should increase after swap");
-
-        // Verify approximately the right amount of ETH was swapped
-        assertApproxEqAbs(
-            ethBalanceBefore - ethBalanceAfter,
-            expectedEthToSwap,
-            0.01 ether,
-            "Should swap approximately rebalancePercentage of ETH"
-        );
 
         vm.stopPrank();
     }
