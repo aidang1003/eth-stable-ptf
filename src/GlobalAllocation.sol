@@ -146,7 +146,7 @@ contract GlobalAllocation is Ownable {
     function swapTokenForEth() internal {
         uint256 maxTokenToSend = (desiredEthToTokenAllocationPercentage - currentEthToTokenAllocationPercentage)
             * sTotalPortfolioValueInToken2 / (1 ** I_Token2Decimals);
-        uint256 minEthToRecieve = maxTokenToSend / sEthPriceInToken2;
+        uint256 minEthToRecieve = (maxTokenToSend * 1e18) / sEthPriceInToken2;
 
         // Approve Uniswap router to spend USDC
         IERC20Metadata(I_TOKEN2).approve(address(I_UNISWAP_V2_ROUTER_02), maxTokenToSend);
