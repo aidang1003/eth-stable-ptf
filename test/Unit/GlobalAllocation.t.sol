@@ -208,13 +208,10 @@ contract GlobalAllocationTest is Test {
         path[1] = USDC_ADDRESS;
 
         // Whale swaps 500 ETH for USDC, crashing ETH price
-        IUniswapV2Router02(UNISWAP_V2_ROUTER02).swapExactTokensForTokens({
-            amountIn: 500 ether,
-            amountOutMin: 0,
-            path: path,
-            to: whale,
-            deadline: block.timestamp + 15 minutes
-        });
+        IUniswapV2Router02(UNISWAP_V2_ROUTER02)
+            .swapExactTokensForTokens({
+                amountIn: 500 ether, amountOutMin: 0, path: path, to: whale, deadline: block.timestamp + 15 minutes
+            });
 
         vm.stopPrank();
 

@@ -88,9 +88,9 @@ contract GlobalAllocation is Ownable {
                 "Value will be truncated when type casting"
             );
             // casting to 'uint24' is safe because require statement above ensures value ≤ type(uint24).max
-            // forge-lint: disable-next-line(unsafe-typecast)
             currentEthToTokenAllocationPercentage =
-                uint24(sEthPortfolioBalanceInToken2 * 1e6 / sTotalPortfolioValueInToken2);
+            // forge-lint: disable-next-line(unsafe-typecast)
+            uint24(sEthPortfolioBalanceInToken2 * 1e6 / sTotalPortfolioValueInToken2);
         }
 
         // console2.log("Eth price in token2", sEthPriceInToken2);
