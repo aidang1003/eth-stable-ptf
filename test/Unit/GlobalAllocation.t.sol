@@ -98,11 +98,7 @@ contract GlobalAllocationTest is Test {
         assertEq(token2.balanceOf(address(globalAllocation)), 0, "Contract USDC balance should be 0 after withdrawal");
 
         // Verify user received both ETH and USDC
-        assertEq(
-            user.balance,
-            userEthBalanceBefore + contractEthBalance,
-            "User should receive all ETH from contract"
-        );
+        assertEq(user.balance, userEthBalanceBefore + contractEthBalance, "User should receive all ETH from contract");
         assertEq(
             token2.balanceOf(user),
             userUsdcBalanceBefore + contractUsdcBalance,

@@ -8,7 +8,7 @@ address constant UNISWAP_V2_PAIR_ETH_USDC = 0xB4e16d0168e52d35CaCD2c6185b44281Ec
 // Chainlink Addresses https://docs.chain.link/data-feeds/price-feeds/addresses
 address constant MAINNET_ETH_USDC_ORACLE_ADDRESS = 0x986b5E1e1755e3C2440e960477f25201B0a8bbD4; // Ethereum mainnet ETH/USDC price oracle address
 address constant MAINNET_ETH_USDT_ORACLE_ADDRESS = 0xEe9F2375b4bdF6387aa8265dD4FB8F16512A1d46; // Ethereum mainnet ETH/USDT price oracle address
-
+address constant MAINNET_ETH_USD_ORACLE_ADDRESS = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419; // Ethereum mainnet ETH/USD price oracle address
 address constant SEPOLIA_ETH_USD_ORACLE_ADDRESS = 0x694AA1769357215DE4FAC081bf1f309aDC325306; // Ethereum Sepolia ETH/USD price oracle address
 
 // Token Addresses
