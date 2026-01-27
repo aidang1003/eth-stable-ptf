@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract GlobalAllocation is Ownable {
     uint24 public desiredEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
@@ -39,11 +40,11 @@ contract GlobalAllocation is Ownable {
         uint24 _rebalancePercentage
     ) Ownable(msg.sender) {
         require(
-            _desiredEthToTokenAllocationPercentage <= 1000000 && _desiredEthToTokenAllocationPercentage >= 10000,
+            _desiredEthToTokenAllocationPercentage >= 1e4 && _desiredEthToTokenAllocationPercentage <= 1e6,
             "Allocation percentage must be between 1.0000% and 100.0000%"
         );
         require(
-            _rebalancePercentage <= 100000 && _rebalancePercentage >= 1000,
+            _rebalancePercentage >= 1e3 && _rebalancePercentage <= 1e5,
             "Rebalance percentage must be between 0.1000% and 10.0000%"
         );
 
@@ -74,21 +75,28 @@ contract GlobalAllocation is Ownable {
      * @dev Update Portfolio based on most recently quoted token2 value
      */
     function updateCurrentAllocationPercentage() public {
-        sTotalPortfolioValueInToken2 =
-            (sEthPriceInToken2 * address(this).balance / 1e18) + IERC20Metadata(I_TOKEN2).balanceOf(address(this));
+        uint256 ethPortfolioBalance = sEthPriceInToken2 * address(this).balance / 1e18;
+        sTotalPortfolioValueInToken2 = ethPortfolioBalance + IERC20Metadata(I_TOKEN2).balanceOf(address(this));
 
         if (address(this).balance == 0) {
             currentEthToTokenAllocationPercentage = 0;
             return;
         } else {
             require(
-                (sEthPriceInToken2 * 1000000) / sTotalPortfolioValueInToken2 < type(uint24).max,
+                ethPortfolioBalance / sTotalPortfolioValueInToken2 < type(uint24).max,
                 "Value will be truncated when type casting"
             );
             // casting to 'uint24' is safe because require statement above ensures value ≤ type(uint24).max
             // forge-lint: disable-next-line(unsafe-typecast)
-            currentEthToTokenAllocationPercentage = uint24((sEthPriceInToken2 * 1000000) / sTotalPortfolioValueInToken2);
+            currentEthToTokenAllocationPercentage = uint24(ethPortfolioBalance / sTotalPortfolioValueInToken2);
         }
+
+        console2.log("Eth price in token2", sEthPriceInToken2);
+        console2.log("Contract Eth balance", address(this).balance);
+        console2.log("Eth balance in token2", ethPortfolioBalance);
+        console2.log("Contract token2 balance", IERC20Metadata(I_TOKEN2).balanceOf(address(this)));
+        console2.log("Total portfolio balnce in token2", sTotalPortfolioValueInToken2); // 6 decimals?
+        console2.log("Eth To Token2 allocation percentage", currentEthToTokenAllocationPercentage); // 4 decimals?
 
         // Update State
         sAllocationState = AllocationState.CURRENT_ALLOCATION_PERCENTAGE_UPDATED;
@@ -127,10 +135,10 @@ contract GlobalAllocation is Ownable {
      */
     function swapEthForToken() internal {
         uint256 minTokenToRecieve = (currentEthToTokenAllocationPercentage - desiredEthToTokenAllocationPercentage)
-            * sTotalPortfolioValueInToken2 / (1 ** I_Token2Decimals);
+            * sTotalPortfolioValueInToken2 / (10 ** I_Token2Decimals);
 
         // Use quoted price to send the max eth required for transaction to go through
-        uint256 maxEthToSend = (minTokenToRecieve * 1e18) / sEthPriceInToken2;
+        uint256 maxEthToSend = (minTokenToRecieve * 1e18) / (sEthPriceInToken2 * (10 ** I_Token2Decimals));
 
         I_UNISWAP_V2_ROUTER_02.swapExactETHForTokens{value: maxEthToSend}({
             amountOutMin: minTokenToRecieve,
@@ -145,8 +153,8 @@ contract GlobalAllocation is Ownable {
      */
     function swapTokenForEth() internal {
         uint256 maxTokenToSend = (desiredEthToTokenAllocationPercentage - currentEthToTokenAllocationPercentage)
-            * sTotalPortfolioValueInToken2 / (1 ** I_Token2Decimals);
-        uint256 minEthToRecieve = (maxTokenToSend * 1e18) / sEthPriceInToken2;
+            * sTotalPortfolioValueInToken2 / (10 ** I_Token2Decimals);
+        uint256 minEthToRecieve = (maxTokenToSend * 1e18) / (sEthPriceInToken2 * (10 ** I_Token2Decimals));
 
         // Approve Uniswap router to spend USDC
         IERC20Metadata(I_TOKEN2).approve(address(I_UNISWAP_V2_ROUTER_02), maxTokenToSend);
