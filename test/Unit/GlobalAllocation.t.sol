@@ -6,7 +6,8 @@ import {console2} from "forge-std/console2.sol";
 import {GlobalAllocation} from "../../src/GlobalAllocation.sol";
 import {DeployGlobalAllocation} from "../../script/DeployGlobalAllocation.s.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {USDC_ADDRESS} from "src/Constants.sol";
+import {USDC_ADDRESS, UNISWAP_V2_PAIR_ETH_USDC, WETH_ADDRESS} from "src/Constants.sol";
+import {IUniswapV2Pair} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 
 contract GlobalAllocationTest is Test {
     GlobalAllocation public globalAllocation;
@@ -128,6 +129,58 @@ contract GlobalAllocationTest is Test {
 
         // Verify USDC balance increased
         assertGt(usdcBalanceAfter, usdcBalanceBefore, "USDC balance should increase after swap");
+
+        vm.stopPrank();
+    }
+
+    function testSwapTokenForEth() public {
+        vm.startPrank(user);
+
+        // First swap ETH for USDC to have both assets in the contract
+        globalAllocation.balanceFundsExternal();
+
+        // Verify we have both ETH and USDC
+        uint256 usdcAfterFirstSwap = token2.balanceOf(address(globalAllocation));
+        uint256 ethAfterFirstSwap = address(globalAllocation).balance;
+        assertGt(usdcAfterFirstSwap, 0, "Should have USDC after first swap");
+        assertGt(ethAfterFirstSwap, 0, "Should have ETH after first swap");
+
+        vm.stopPrank();
+
+        // Manipulate the Uniswap pool to decrease ETH price
+        // Add ETH liquidity to the pool to make ETH cheaper relative to USDC
+        IUniswapV2Pair pair = IUniswapV2Pair(UNISWAP_V2_PAIR_ETH_USDC);
+
+        // Deal a large amount of ETH to the pair to crash the ETH price
+        address whale = address(0x999);
+        vm.deal(whale, 1000 ether);
+
+        vm.startPrank(whale);
+        // Send ETH directly to the pair and swap for USDC to decrease ETH price
+        (bool success,) = address(pair).call{value: 500 ether}("");
+        require(success, "ETH transfer to pair failed");
+        pair.swap(0, 1000000e6, whale, ""); // Swap for USDC, crashing ETH price
+        vm.stopPrank();
+
+        vm.startPrank(user);
+
+        // Record balances before swap
+        uint256 ethBalanceBefore = address(globalAllocation).balance;
+        uint256 usdcBalanceBefore = token2.balanceOf(address(globalAllocation));
+
+        // Trigger the swap by calling balanceFundsExternal
+        // This will call swapTokenForEth since ETH price crashed (currentAllocation < desiredAllocation)
+        globalAllocation.balanceFundsExternal();
+
+        // Get balances after swap
+        uint256 ethBalanceAfter = address(globalAllocation).balance;
+        uint256 usdcBalanceAfter = token2.balanceOf(address(globalAllocation));
+
+        // Verify USDC balance decreased
+        assertLt(usdcBalanceAfter, usdcBalanceBefore, "USDC balance should decrease after swap");
+
+        // Verify ETH balance increased
+        assertGt(ethBalanceAfter, ethBalanceBefore, "ETH balance should increase after swap");
 
         vm.stopPrank();
     }
