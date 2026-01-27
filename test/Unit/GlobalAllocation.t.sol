@@ -2,12 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {console2} from "forge-std/console2.sol";
+// import {console2} from "forge-std/console2.sol";
 import {GlobalAllocation} from "../../src/GlobalAllocation.sol";
 import {DeployGlobalAllocation} from "../../script/DeployGlobalAllocation.s.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {USDC_ADDRESS, UNISWAP_V2_PAIR_ETH_USDC, WETH_ADDRESS} from "src/Constants.sol";
-import {IUniswapV2Pair} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
+import {USDC_ADDRESS, WETH_ADDRESS, UNISWAP_V2_ROUTER02} from "src/Constants.sol";
+import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 contract GlobalAllocationTest is Test {
     GlobalAllocation public globalAllocation;
@@ -136,6 +136,47 @@ contract GlobalAllocationTest is Test {
     function testSwapTokenForEth() public {
         vm.startPrank(user);
 
+        // Withdraw all ETH from the contract to start fresh
+        globalAllocation.withdraw();
+
+        // Verify contract has no ETH
+        assertEq(address(globalAllocation).balance, 0, "Contract should have no ETH after withdrawal");
+
+        uint256 usdcAmount = 1000e6; // $1,000 USDC (6 decimals)
+        deal(USDC_ADDRESS, user, usdcAmount);
+
+        // Deposit USDC to the contract
+        bool success = globalAllocation.depositToken2(usdcAmount);
+        require(success, "USDC deposit failed");
+
+        // Verify contract has USDC and no ETH
+        assertEq(token2.balanceOf(address(globalAllocation)), usdcAmount, "Contract should have $10k USDC");
+        assertEq(address(globalAllocation).balance, 0, "Contract should still have no ETH");
+
+        // Record balances before swap
+        uint256 ethBalanceBefore = address(globalAllocation).balance;
+        uint256 usdcBalanceBefore = token2.balanceOf(address(globalAllocation));
+
+        // Trigger the swap by calling balanceFundsExternal
+        // This will call swapTokenForEth since we only have USDC (currentAllocation < desiredAllocation)
+        globalAllocation.balanceFundsExternal();
+
+        // Get balances after swap
+        uint256 ethBalanceAfter = address(globalAllocation).balance;
+        uint256 usdcBalanceAfter = token2.balanceOf(address(globalAllocation));
+
+        // Verify USDC balance decreased
+        assertLt(usdcBalanceAfter, usdcBalanceBefore, "USDC balance should decrease after swap");
+
+        // Verify ETH balance increased
+        assertGt(ethBalanceAfter, ethBalanceBefore, "ETH balance should increase after swap");
+
+        vm.stopPrank();
+    }
+
+    function testSwapTokenForEthWithWhale() public {
+        vm.startPrank(user);
+
         // First swap ETH for USDC to have both assets in the contract
         globalAllocation.balanceFundsExternal();
 
@@ -148,18 +189,33 @@ contract GlobalAllocationTest is Test {
         vm.stopPrank();
 
         // Manipulate the Uniswap pool to decrease ETH price
-        // Add ETH liquidity to the pool to make ETH cheaper relative to USDC
-        IUniswapV2Pair pair = IUniswapV2Pair(UNISWAP_V2_PAIR_ETH_USDC);
-
-        // Deal a large amount of ETH to the pair to crash the ETH price
+        // Have a whale swap a large amount of ETH for USDC to crash ETH price
         address whale = address(0x999);
         vm.deal(whale, 1000 ether);
 
         vm.startPrank(whale);
-        // Send ETH directly to the pair and swap for USDC to decrease ETH price
-        (bool success,) = address(pair).call{value: 500 ether}("");
-        require(success, "ETH transfer to pair failed");
-        pair.swap(0, 1000000e6, whale, ""); // Swap for USDC, crashing ETH price
+
+        // Get WETH for the whale
+        (bool success,) = WETH_ADDRESS.call{value: 500 ether}("");
+        require(success, "WETH deposit failed");
+
+        // Approve Uniswap router to spend whale's WETH
+        IERC20(WETH_ADDRESS).approve(UNISWAP_V2_ROUTER02, 500 ether);
+
+        // Build path for swap
+        address[] memory path = new address[](2);
+        path[0] = WETH_ADDRESS;
+        path[1] = USDC_ADDRESS;
+
+        // Whale swaps 500 ETH for USDC, crashing ETH price
+        IUniswapV2Router02(UNISWAP_V2_ROUTER02).swapExactTokensForTokens({
+            amountIn: 500 ether,
+            amountOutMin: 0,
+            path: path,
+            to: whale,
+            deadline: block.timestamp + 15 minutes
+        });
+
         vm.stopPrank();
 
         vm.startPrank(user);
