@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {console2} from "forge-std/console2.sol";
+// import {console2} from "forge-std/console2.sol";
 import {GlobalAllocation} from "../../src/GlobalAllocation.sol";
 import {DeployGlobalAllocation} from "../../script/DeployGlobalAllocation.s.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
@@ -39,9 +39,6 @@ contract GlobalAllocationTest is Test {
         token2.approve(address(globalAllocation), type(uint256).max);
 
         vm.stopPrank();
-
-        console2.log("Chain ID", block.chainid);
-        console2.log("WETH Address", wethAddress);
     }
 
     function testDeposit() public {
@@ -180,6 +177,54 @@ contract GlobalAllocationTest is Test {
 
         // Verify ETH balance increased
         assertGt(ethBalanceAfter, ethBalanceBefore, "ETH balance should increase after swap");
+
+        vm.stopPrank();
+    }
+
+    function testRebalanceRevertsWhenEthHigherWithinThreshold() public {
+        vm.startPrank(user);
+
+        // First, balance the funds so we're at the desired allocation
+        globalAllocation.balanceFundsExternal();
+
+        // Verify we now have both ETH and USDC (meaning we're balanced)
+        uint256 ethBalance = address(globalAllocation).balance;
+        uint256 usdcBalance = token2.balanceOf(address(globalAllocation));
+        assertGt(ethBalance, 0, "Should have ETH after first balance");
+        assertGt(usdcBalance, 0, "Should have USDC after first balance");
+
+        // Fund the contract with initial ETH deposit
+        (bool success,) = address(globalAllocation).call{value: 6e16}(""); // 0.06 ether
+        require(success, "Deposit failed");
+
+        // Now try to rebalance again - should revert since we're within threshold
+        // This tests the absolute difference check works when current ≈ desired
+        vm.expectRevert("No re-balancing needed");
+        globalAllocation.balanceFundsExternal();
+
+        vm.stopPrank();
+    }
+
+    function testRebalanceRevertsWhenUsdHigherWithinThreshold() public {
+        vm.startPrank(user);
+
+        // First, balance the funds so we're at the desired allocation
+        globalAllocation.balanceFundsExternal();
+
+        // Verify we now have both ETH and USDC (meaning we're balanced)
+        uint256 ethBalance = address(globalAllocation).balance;
+        uint256 usdcBalance = token2.balanceOf(address(globalAllocation));
+        assertGt(ethBalance, 0, "Should have ETH after first balance");
+        assertGt(usdcBalance, 0, "Should have USDC after first balance");
+
+        // Fund the contract with initial ETH deposit
+        bool success = globalAllocation.depositToken2(1e8); // $100
+        require(success, "USDC deposit failed");
+
+        // Now try to rebalance again - should revert since we're within threshold
+        // This tests the absolute difference check works when current ≈ desired
+        vm.expectRevert("No re-balancing needed");
+        globalAllocation.balanceFundsExternal();
 
         vm.stopPrank();
     }

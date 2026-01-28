@@ -94,6 +94,15 @@ contract GlobalAllocation is Ownable {
             currentEthToTokenAllocationPercentage =
             // forge-lint: disable-next-line(unsafe-typecast)
             uint24(sEthPortfolioBalanceInToken2 * 1e6 / sTotalPortfolioValueInToken2);
+            console2.log("Current Eth Allocation Percentage:", currentEthToTokenAllocationPercentage);
+            console2.log("Desired Eth Allocation Percentage:", desiredEthToTokenAllocationPercentage);
+            require(
+                (currentEthToTokenAllocationPercentage > desiredEthToTokenAllocationPercentage
+                            ? currentEthToTokenAllocationPercentage - desiredEthToTokenAllocationPercentage
+                            : desiredEthToTokenAllocationPercentage - currentEthToTokenAllocationPercentage)
+                    > rebalancePercentage,
+                "No re-balancing needed"
+            );
         }
 
         // console2.log("Eth price in token2", sEthPriceInToken2);
@@ -145,10 +154,11 @@ contract GlobalAllocation is Ownable {
         // Use quoted price to send set a max eth willing to pay for transaction to go through
         uint256 maxEthToSend = (minTokenToRecieve * 1e18) / sEthPriceInToken2;
 
-        // console2.log("Total Portfolio Value in Token2", sTotalPortfolioValueInToken2);
-        // console2.log("Current allocation percentage", currentEthToTokenAllocationPercentage);
-        // console2.log("Desired allocation percentage", desiredEthToTokenAllocationPercentage);
-        // console2.log("Min token to receive", minTokenToRecieve);
+        console2.log("Total Portfolio Value in Token2", sTotalPortfolioValueInToken2);
+        console2.log("Current allocation percentage", currentEthToTokenAllocationPercentage);
+        console2.log("Desired allocation percentage", desiredEthToTokenAllocationPercentage);
+        console2.log("Max Eth to send", maxEthToSend);
+        console2.log("Min token to receive", minTokenToRecieve);
 
         I_UNISWAP_V2_ROUTER_02.swapExactETHForTokens{value: maxEthToSend}({
             amountOutMin: minTokenToRecieve,
