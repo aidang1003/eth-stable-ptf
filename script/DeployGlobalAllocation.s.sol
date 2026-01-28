@@ -3,9 +3,11 @@ pragma solidity ^0.8.24;
 
 import {Script} from "forge-std/Script.sol";
 import {GlobalAllocation} from "src/GlobalAllocation.sol";
-import {HelperConfig} from "HelperConfig.s.sol";
+import {HelperConfig} from "script/HelperConfig.s.sol";
 
 contract DeployGlobalAllocation is Script {
+    HelperConfig public helperConfig;
+
     function run() public {
         deployContract(msg.sender);
     }

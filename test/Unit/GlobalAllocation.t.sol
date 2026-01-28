@@ -6,12 +6,19 @@ import {Test} from "forge-std/Test.sol";
 import {GlobalAllocation} from "../../src/GlobalAllocation.sol";
 import {DeployGlobalAllocation} from "../../script/DeployGlobalAllocation.s.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {USDC_ADDRESS, WETH_ADDRESS, UNISWAP_V2_ROUTER02} from "src/Constants.sol";
+import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 contract GlobalAllocationTest is Test {
+    HelperConfig public helperConfig = new HelperConfig();
+    HelperConfig.NetworkConfig config = helperConfig.getConfig();
+
+    address public wethAddress = config.token1;
+    address public usdcAddress = config.token2;
+    address public uniswapV2Router02 = config.uniswapRouter;
+
     GlobalAllocation public globalAllocation;
-    IERC20 public token2 = IERC20(USDC_ADDRESS);
+    IERC20 public token2 = IERC20(usdcAddress);
 
     address public user = address(1);
     uint256 public constant INITIAL_DEPOSIT = 1 ether;
@@ -143,7 +150,7 @@ contract GlobalAllocationTest is Test {
         assertEq(address(globalAllocation).balance, 0, "Contract should have no ETH after withdrawal");
 
         uint256 usdcAmount = 1000e6; // $1,000 USDC (6 decimals)
-        deal(USDC_ADDRESS, user, usdcAmount);
+        deal(usdcAddress, user, usdcAmount);
 
         // Deposit USDC to the contract
         bool success = globalAllocation.depositToken2(usdcAmount);
@@ -196,19 +203,19 @@ contract GlobalAllocationTest is Test {
         vm.startPrank(whale);
 
         // Get WETH for the whale
-        (bool success,) = WETH_ADDRESS.call{value: 500 ether}("");
+        (bool success,) = wethAddress.call{value: 500 ether}("");
         require(success, "WETH deposit failed");
 
         // Approve Uniswap router to spend whale's WETH
-        IERC20(WETH_ADDRESS).approve(UNISWAP_V2_ROUTER02, 500 ether);
+        IERC20(wethAddress).approve(uniswapV2Router02, 500 ether);
 
         // Build path for swap
         address[] memory path = new address[](2);
-        path[0] = WETH_ADDRESS;
-        path[1] = USDC_ADDRESS;
+        path[0] = wethAddress;
+        path[1] = usdcAddress;
 
         // Whale swaps 500 ETH for USDC, crashing ETH price
-        IUniswapV2Router02(UNISWAP_V2_ROUTER02)
+        IUniswapV2Router02(uniswapV2Router02)
             .swapExactTokensForTokens({
                 amountIn: 500 ether, amountOutMin: 0, path: path, to: whale, deadline: block.timestamp + 15 minutes
             });

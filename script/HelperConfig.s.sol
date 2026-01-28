@@ -5,8 +5,8 @@ import {Script} from "forge-std/Script.sol";
 
 abstract contract CodeConstants {
     /* Global Allocation Deploy values */
-    uint256 public DESIRED_ETH_ALLOCATION_PERCENTAGE = 500000; // 50%
-    uint256 public REBALANCE_PERCENTAGE = 40000; // 4%
+    uint24 constant DESIRED_ETH_ALLOCATION_PERCENTAGE = 500000; // 50%
+    uint24 constant REBALANCE_PERCENTAGE = 40000; // 4%
 
     /* WETH Addresses */
     address constant WETH_MAINNET = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // WETH token address on Ethereum Mainnet
@@ -32,8 +32,8 @@ contract HelperConfig is CodeConstants, Script {
         address token1;
         address token2;
         address uniswapRouter;
-        uint256 desiredEthallocationPercentage;
-        uint256 rebalancePercentage;
+        uint24 desiredEthallocationPercentage;
+        uint24 rebalancePercentage;
     }
 
     mapping(uint256 => NetworkConfig) public networkConfigs;
@@ -48,12 +48,12 @@ contract HelperConfig is CodeConstants, Script {
         networkConfigs[chainId] = networkConfig;
     }
 
-    function getConfig() public returns (NetworkConfig memory) {
-        return getConfigByChainID(block.chainid);
+    function getConfig() public view returns (NetworkConfig memory) {
+        return getConfigByChainId(block.chainid);
     }
 
-    function getConfigByChainID(uint256 chainId) public returns (NetworkConfig memory) {
-        if (networkConfigs[chainId].vrfCoordinator != address(0)) {
+    function getConfigByChainId(uint256 chainId) public view returns (NetworkConfig memory) {
+        if (networkConfigs[chainId].token1 != address(0)) {
             return networkConfigs[chainId];
         } else {
             revert HelperConfig__InvalidChainId();
