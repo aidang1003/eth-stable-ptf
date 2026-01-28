@@ -10,7 +10,7 @@ abstract contract CodeConstants {
 
     /* WETH Addresses */
     address constant WETH_MAINNET = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // WETH token address on Ethereum Mainnet
-    address constant WETH_SEPOLIA = 0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9; // WETH token address on Ethereum Sepolia
+    address constant WETH_SEPOLIA = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14; // WETH token address on Ethereum Sepolia *Defined on Uni contract
     /* USD Addresses https://developers.circle.com/stablecoins/usdc-contract-addresses */
     address constant USDC_MAINNET = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48; // USDC token address on Ethereum Mainnet
     address constant USDC_SEPOLIA = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238; // USDC token address on Ethereum Sepolia

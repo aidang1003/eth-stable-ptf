@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-// import {console2} from "forge-std/console2.sol";
+import {console2} from "forge-std/console2.sol";
 import {GlobalAllocation} from "../../src/GlobalAllocation.sol";
 import {DeployGlobalAllocation} from "../../script/DeployGlobalAllocation.s.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
@@ -39,6 +39,9 @@ contract GlobalAllocationTest is Test {
         token2.approve(address(globalAllocation), type(uint256).max);
 
         vm.stopPrank();
+
+        console2.log("Chain ID", block.chainid);
+        console2.log("WETH Address", wethAddress);
     }
 
     function testDeposit() public {

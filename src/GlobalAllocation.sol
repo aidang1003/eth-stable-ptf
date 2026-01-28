@@ -10,6 +10,7 @@ contract GlobalAllocation is Ownable {
     uint24 public desiredEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
     uint24 public currentEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
     uint24 public rebalancePercentage; // percentage threshold of when to reset the allocation percentages
+    uint24 public slippage;
 
     /* Type Declarations */
     enum AllocationState {
@@ -38,7 +39,8 @@ contract GlobalAllocation is Ownable {
         address _token2,
         address _uniswapRouter,
         uint24 _desiredEthToTokenAllocationPercentage,
-        uint24 _rebalancePercentage
+        uint24 _rebalancePercentage,
+        uint24 _slippage
     ) Ownable(msg.sender) {
         require(
             _desiredEthToTokenAllocationPercentage >= 1e4 && _desiredEthToTokenAllocationPercentage <= 1e6,
@@ -56,6 +58,7 @@ contract GlobalAllocation is Ownable {
         sToken2ToToken1Path = [I_TOKEN2, I_TOKEN1];
         desiredEthToTokenAllocationPercentage = _desiredEthToTokenAllocationPercentage;
         rebalancePercentage = _rebalancePercentage;
+        slippage = _slippage;
         I_TOKEN2_DECIMALS = IERC20Metadata(I_TOKEN2).decimals();
     }
 
@@ -159,7 +162,6 @@ contract GlobalAllocation is Ownable {
      * @dev Swaps token for ETH using Uniswap
      */
     function swapTokenForEth() internal {
-        uint24 slippage = 10000; // 01.0000%
         uint256 maxTokenToSend = (desiredEthToTokenAllocationPercentage - currentEthToTokenAllocationPercentage)
             * sTotalPortfolioValueInToken2 / (10 ** I_TOKEN2_DECIMALS);
 
