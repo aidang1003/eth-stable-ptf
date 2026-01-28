@@ -24,6 +24,7 @@ contract GlobalAllocation is Ownable {
     address private immutable I_TOKEN1; // Specify token1 address (ETH)
     address private immutable I_TOKEN2; // Specify token2 address (USDT)
     uint8 private immutable I_TOKEN2_DECIMALS;
+    IUniswapV2Router02 private immutable I_UNISWAP_V2_ROUTER_02;
 
     uint256 private sEthPortfolioBalanceInToken2;
     uint256 private sTotalPortfolioValueInToken2;
@@ -32,7 +33,7 @@ contract GlobalAllocation is Ownable {
     address[] private sToken2ToToken1Path;
     AllocationState private sAllocationState;
 
-    IUniswapV2Router02 private immutable I_UNISWAP_V2_ROUTER_02;
+    /* Events */
 
     constructor(
         address _token1,
