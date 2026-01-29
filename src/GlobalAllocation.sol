@@ -34,9 +34,10 @@ contract GlobalAllocation is Ownable {
     AllocationState private sAllocationState;
 
     /* Events */
-    event Withdraw(uint256 ethWithdrawn, uint256 token2Withdrawn);
     event EthForToken(uint256 maxEthOut, uint256 minTokenIn);
     event TokenForEth(uint256 maxTokenOut, uint256 minEthIn);
+    event RebalncePerformed(uint256, uint24);
+    event BalanceFundsCalled(address caller);
 
     constructor(
         address _token1,
@@ -109,6 +110,7 @@ contract GlobalAllocation is Ownable {
             );
         }
 
+        emit RebalncePerformed(sTotalPortfolioValueInToken2, currentEthToTokenAllocationPercentage / 10000);
         // console2.log("Eth price in token2", sEthPriceInToken2);
         // console2.log("Contract Eth balance", address(this).balance);
         // console2.log("Eth balance in token2", sEthPortfolioBalanceInToken2);
@@ -124,6 +126,7 @@ contract GlobalAllocation is Ownable {
      * @dev Allow owner to balance funds manually
      */
     function balanceFundsExternal() external onlyOwner {
+        emit BalanceFundsCalled(msg.sender);
         balanceFunds();
     }
 
@@ -234,15 +237,10 @@ contract GlobalAllocation is Ownable {
      * @dev Allow user to withdraw all funds from the contract
      */
     function withdraw() external onlyOwner {
-        uint256 ethBalance = address(this).balance;
-        uint256 token2Balance = IERC20Metadata(I_TOKEN2).balanceOf(address(this));
-
         (bool success,) = msg.sender.call{value: address(this).balance}("");
         require(success, "Eth withdraw failed");
 
         success = IERC20Metadata(I_TOKEN2).transfer(msg.sender, IERC20Metadata(I_TOKEN2).balanceOf(address(this)));
         require(success, "Token withdraw failed");
-
-        emit Withdraw(ethBalance, token2Balance);
     }
 }
