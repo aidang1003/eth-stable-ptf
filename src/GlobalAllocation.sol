@@ -35,6 +35,8 @@ contract GlobalAllocation is Ownable {
 
     /* Events */
     event Withdraw(uint256 ethWithdrawn, uint256 token2Withdrawn);
+    event EthForToken(uint256 maxEthOut, uint256 minTokenIn);
+    event TokenForEth(uint256 maxTokenOut, uint256 minEthIn);
 
     constructor(
         address _token1,
@@ -162,12 +164,14 @@ contract GlobalAllocation is Ownable {
         console2.log("Max Eth to send", maxEthToSend);
         console2.log("Min token to receive", minTokenToRecieve);
 
-        I_UNISWAP_V2_ROUTER_02.swapExactETHForTokens{value: maxEthToSend}({
+        uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.swapExactETHForTokens{value: maxEthToSend}({
             amountOutMin: minTokenToRecieve,
             path: sToken1ToToken2Path,
             to: address(this),
             deadline: block.timestamp + 15 minutes
         });
+
+        emit TokenForEth(returnAmounts[0], returnAmounts[1]);
     }
 
     /**
@@ -189,13 +193,15 @@ contract GlobalAllocation is Ownable {
         // Approve Uniswap router to spend USDC
         IERC20Metadata(I_TOKEN2).approve(address(I_UNISWAP_V2_ROUTER_02), maxTokenToSend);
 
-        I_UNISWAP_V2_ROUTER_02.swapExactTokensForETH({
+        uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.swapExactTokensForETH({
             amountIn: maxTokenToSend,
             amountOutMin: (minEthToRecieve * (1e6 - slippage)) / 1e6,
             path: sToken2ToToken1Path,
             to: address(this),
             deadline: block.timestamp + 15 minutes
         });
+
+        emit TokenForEth(returnAmounts[0], returnAmounts[1]);
     }
 
     /**
