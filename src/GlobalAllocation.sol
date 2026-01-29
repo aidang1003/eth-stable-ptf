@@ -34,6 +34,7 @@ contract GlobalAllocation is Ownable {
     AllocationState private sAllocationState;
 
     /* Events */
+    event Withdraw(uint256 ethWithdrawn, uint256 token2Withdrawn);
 
     constructor(
         address _token1,
@@ -227,10 +228,15 @@ contract GlobalAllocation is Ownable {
      * @dev Allow user to withdraw all funds from the contract
      */
     function withdraw() external onlyOwner {
+        uint256 ethBalance = address(this).balance;
+        uint256 token2Balance = IERC20Metadata(I_TOKEN2).balanceOf(address(this));
+
         (bool success,) = msg.sender.call{value: address(this).balance}("");
         require(success, "Eth withdraw failed");
 
         success = IERC20Metadata(I_TOKEN2).transfer(msg.sender, IERC20Metadata(I_TOKEN2).balanceOf(address(this)));
         require(success, "Token withdraw failed");
+
+        emit Withdraw(ethBalance, token2Balance);
     }
 }
