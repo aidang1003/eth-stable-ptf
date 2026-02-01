@@ -3,8 +3,8 @@ pragma solidity ^0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import {console2} from "forge-std/console2.sol";
 
 contract GlobalAllocation is Ownable, ReentrancyGuard {
@@ -77,7 +77,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      * The Chainlink value is to ensure that the Uniswap price quote is reasonable when performing a larger transaction
      * Use a Uniswap quote to get ETH value in token2 terms
      */
-    function quoteEthPriceInToken2() public {
+    function quoteEthPriceInToken2() private {
         uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.getAmountsOut(1 ether, sToken1ToToken2Path);
         sEthPriceInToken2 = returnAmounts[1];
     }
@@ -85,7 +85,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /**
      * @dev Update Portfolio based on most recently quoted token2 value
      */
-    function updateCurrentAllocationPercentage() public {
+    function updateCurrentAllocationPercentage() private {
         sEthPortfolioBalanceInToken2 = sEthPriceInToken2 * address(this).balance / 1e18;
         sTotalPortfolioValueInToken2 = sEthPortfolioBalanceInToken2 + IERC20Metadata(I_TOKEN2).balanceOf(address(this));
 
@@ -124,7 +124,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /**
      * @dev Allow owner to balance funds manually
      */
-    function balanceFundsExternal() external onlyOwner {
+    function balanceFundsExternal() external {
         emit BalanceFundsCalled(msg.sender);
         balanceFunds();
     }
@@ -220,7 +220,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      * @param _amount Amount of token2 to transfer from user's wallet to this contract
      * @return success Boolean indicating if the transfer was successful
      */
-    function depositToken2(uint256 _amount) public returns (bool success) {
+    function depositToken2(uint256 _amount) external returns (bool success) {
         if (_amount <= 0) {
             revert Allocation__ReceiveToken2ValueIsNull();
         }
