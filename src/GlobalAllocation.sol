@@ -12,6 +12,9 @@ contract GlobalAllocation is Ownable {
     error Allocation__RebalancePercentageOutsideOfRange();
     error Allocation__OverflowUpdatingCurrentAllocation();
     error Allocation__ReAllocationNotNeeded();
+    error Allocation__ReceiveEthValueIsNull();
+    error Allocation__ReceiveToken2ValueIsNull();
+    error Allocation__Token2DepositFailed();
 
     uint24 public desiredEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
     uint24 public currentEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
@@ -101,7 +104,7 @@ contract GlobalAllocation is Ownable {
             if (sEthPortfolioBalanceInToken2 * 1e6 / sTotalPortfolioValueInToken2 > type(uint24).max) {
                 revert Allocation__OverflowUpdatingCurrentAllocation();
             }
-            // casting to 'uint24' is safe because require statement above ensures value ≤ type(uint24).max
+            // casting to 'uint24' is safe because revert-error statement above ensures value ≤ type(uint24).max
             currentEthToTokenAllocationPercentage =
             // forge-lint: disable-next-line(unsafe-typecast)
             uint24(sEthPortfolioBalanceInToken2 * 1e6 / sTotalPortfolioValueInToken2);
@@ -168,11 +171,11 @@ contract GlobalAllocation is Ownable {
         // Use quoted price to send set a max eth willing to pay for transaction to go through
         uint256 maxEthToSend = (minTokenToRecieve * 1e18) / sEthPriceInToken2;
 
-        console2.log("Total Portfolio Value in Token2", sTotalPortfolioValueInToken2);
-        console2.log("Current allocation percentage", currentEthToTokenAllocationPercentage);
-        console2.log("Desired allocation percentage", desiredEthToTokenAllocationPercentage);
-        console2.log("Max Eth to send", maxEthToSend);
-        console2.log("Min token to receive", minTokenToRecieve);
+        // console2.log("Total Portfolio Value in Token2", sTotalPortfolioValueInToken2);
+        // console2.log("Current allocation percentage", currentEthToTokenAllocationPercentage);
+        // console2.log("Desired allocation percentage", desiredEthToTokenAllocationPercentage);
+        // console2.log("Max Eth to send", maxEthToSend);
+        // console2.log("Min token to receive", minTokenToRecieve);
 
         uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.swapExactETHForTokens{value: maxEthToSend}({
             amountOutMin: minTokenToRecieve,
@@ -194,11 +197,11 @@ contract GlobalAllocation is Ownable {
         // Use quoted price to set a min eth received for transaction to go through
         uint256 minEthToRecieve = (maxTokenToSend * 1e18) / sEthPriceInToken2;
 
-        console2.log("Total Portfolio Value in Token2", sTotalPortfolioValueInToken2);
-        console2.log("Current allocation percentage", currentEthToTokenAllocationPercentage);
-        console2.log("Desired allocation percentage", desiredEthToTokenAllocationPercentage);
-        console2.log("Max token to send", maxTokenToSend);
-        console2.log("Min Eth to receive", minEthToRecieve);
+        // console2.log("Total Portfolio Value in Token2", sTotalPortfolioValueInToken2);
+        // console2.log("Current allocation percentage", currentEthToTokenAllocationPercentage);
+        // console2.log("Desired allocation percentage", desiredEthToTokenAllocationPercentage);
+        // console2.log("Max token to send", maxTokenToSend);
+        // console2.log("Min Eth to receive", minEthToRecieve);
 
         // Approve Uniswap router to spend USDC
         IERC20Metadata(I_TOKEN2).approve(address(I_UNISWAP_V2_ROUTER_02), maxTokenToSend);
@@ -218,7 +221,9 @@ contract GlobalAllocation is Ownable {
      * @dev Accept ETH deposits
      */
     receive() external payable {
-        require(msg.value > 0, "Must send ETH to deposit");
+        if(msg.value <= 0) {
+            revert Allocation__ReceiveEthValueIsNull();
+        }
 
         // Setting post deposit state so the next re-balance uses Chainlink price feed instead of Uniswap quote
         sAllocationState = AllocationState.AFTER_DEPOSIT;
@@ -230,11 +235,15 @@ contract GlobalAllocation is Ownable {
      * @return success Boolean indicating if the transfer was successful
      */
     function depositToken2(uint256 _amount) public returns (bool success) {
-        require(_amount > 0, "Must deposit a positive amount");
+        if (_amount <= 0 ) {
+            revert Allocation__ReceiveToken2ValueIsNull();
+        }
 
         // Transfer token2 from msg.sender to this contract
         success = IERC20Metadata(I_TOKEN2).transferFrom(msg.sender, address(this), _amount);
-        require(success, "Token2 transfer failed");
+        if (!success) {
+            revert Allocation__Token2DepositFailed();
+        }
 
         // Setting post deposit state so the next re-balance uses appropriate price feed
         sAllocationState = AllocationState.AFTER_DEPOSIT;
