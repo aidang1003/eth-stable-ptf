@@ -11,7 +11,6 @@ contract GlobalAllocation is Ownable {
     error Allocation__DesiredAllocationOutsideOfRange();
     error Allocation__RebalancePercentageOutsideOfRange();
 
-
     uint24 public desiredEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
     uint24 public currentEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
     uint24 public rebalancePercentage; // percentage threshold of when to reset the allocation percentages
@@ -53,13 +52,13 @@ contract GlobalAllocation is Ownable {
         uint24 _slippage
     ) Ownable(msg.sender) {
         // Allocation percentage must be between 1.0000% and 100.0000%
-        if( _desiredEthToTokenAllocationPercentage <= 1e4 || _desiredEthToTokenAllocationPercentage >= 1e6) {
+        if (_desiredEthToTokenAllocationPercentage <= 1e4 || _desiredEthToTokenAllocationPercentage >= 1e6) {
             revert Allocation__DesiredAllocationOutsideOfRange();
         }
-        
+
         //Rebalance percentage must be between 0.1000% and 10.0000%
         if (_rebalancePercentage <= 1e3 || _rebalancePercentage >= 1e5) {
-           revert Allocation__RebalancePercentageOutsideOfRange();
+            revert Allocation__RebalancePercentageOutsideOfRange();
         }
 
         I_TOKEN1 = _token1;
