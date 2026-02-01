@@ -199,7 +199,7 @@ contract GlobalAllocationTest is Test {
 
         // Now try to rebalance again - should revert since we're within threshold
         // This tests the absolute difference check works when current ≈ desired
-        vm.expectRevert("No re-balancing needed");
+        vm.expectRevert("Allocation__ReAllocaitonNotNeeded()");
         globalAllocation.balanceFundsExternal();
 
         vm.stopPrank();
@@ -223,7 +223,7 @@ contract GlobalAllocationTest is Test {
 
         // Now try to rebalance again - should revert since we're within threshold
         // This tests the absolute difference check works when current ≈ desired
-        vm.expectRevert("No re-balancing needed");
+        vm.expectRevert("Allocation__ReAllocaitonNotNeeded()");
         globalAllocation.balanceFundsExternal();
 
         vm.stopPrank();

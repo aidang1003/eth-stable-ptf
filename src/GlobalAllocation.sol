@@ -10,6 +10,8 @@ contract GlobalAllocation is Ownable {
     /* Errors */
     error Allocation__DesiredAllocationOutsideOfRange();
     error Allocation__RebalancePercentageOutsideOfRange();
+    error Allocation__OverflowUpdatingCurrentAllocation();
+    error Allocation__ReAllocaitonNotNeeded();
 
     uint24 public desiredEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
     uint24 public currentEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
@@ -96,23 +98,23 @@ contract GlobalAllocation is Ownable {
             currentEthToTokenAllocationPercentage = 0;
             return;
         } else {
-            require(
-                sEthPortfolioBalanceInToken2 * 1e6 / sTotalPortfolioValueInToken2 < type(uint24).max,
-                "Value will be truncated when type casting"
-            );
+            if (sEthPortfolioBalanceInToken2 * 1e6 / sTotalPortfolioValueInToken2 > type(uint24).max) {
+                revert Allocation__OverflowUpdatingCurrentAllocation();
+            }
             // casting to 'uint24' is safe because require statement above ensures value ≤ type(uint24).max
             currentEthToTokenAllocationPercentage =
             // forge-lint: disable-next-line(unsafe-typecast)
             uint24(sEthPortfolioBalanceInToken2 * 1e6 / sTotalPortfolioValueInToken2);
             console2.log("Current Eth Allocation Percentage:", currentEthToTokenAllocationPercentage);
             console2.log("Desired Eth Allocation Percentage:", desiredEthToTokenAllocationPercentage);
-            require(
+            if (
                 (currentEthToTokenAllocationPercentage > desiredEthToTokenAllocationPercentage
                             ? currentEthToTokenAllocationPercentage - desiredEthToTokenAllocationPercentage
                             : desiredEthToTokenAllocationPercentage - currentEthToTokenAllocationPercentage)
-                    > rebalancePercentage,
-                "No re-balancing needed"
-            );
+                    < rebalancePercentage
+            ) {
+                revert Allocation__ReAllocaitonNotNeeded();
+            }
         }
 
         emit RebalncePerformed(sTotalPortfolioValueInToken2, currentEthToTokenAllocationPercentage / 10000);
