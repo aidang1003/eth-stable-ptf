@@ -5,7 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
-import {console2} from "forge-std/console2.sol";
+// import {console2} from "forge-std/console2.sol";
 
 contract GlobalAllocation is Ownable, ReentrancyGuard {
     /* Errors */
@@ -100,8 +100,8 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
             currentEthToTokenAllocationPercentage =
             // forge-lint: disable-next-line(unsafe-typecast)
             uint24(sEthPortfolioBalanceInToken2 * 1e6 / sTotalPortfolioValueInToken2);
-            console2.log("Current Eth Allocation Percentage:", currentEthToTokenAllocationPercentage);
-            console2.log("Desired Eth Allocation Percentage:", desiredEthToTokenAllocationPercentage);
+            // console2.log("Current Eth Allocation Percentage:", currentEthToTokenAllocationPercentage);
+            // console2.log("Desired Eth Allocation Percentage:", desiredEthToTokenAllocationPercentage);
             if (
                 (currentEthToTokenAllocationPercentage > desiredEthToTokenAllocationPercentage
                             ? currentEthToTokenAllocationPercentage - desiredEthToTokenAllocationPercentage
