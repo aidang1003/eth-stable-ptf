@@ -15,6 +15,8 @@ contract GlobalAllocation is Ownable {
     error Allocation__ReceiveEthValueIsNull();
     error Allocation__ReceiveToken2ValueIsNull();
     error Allocation__Token2DepositFailed();
+    error Allocation__EthWithdrawFailed();
+    error Allocation__TokenWithdrawFailed();
 
     uint24 public desiredEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
     uint24 public currentEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
@@ -221,7 +223,7 @@ contract GlobalAllocation is Ownable {
      * @dev Accept ETH deposits
      */
     receive() external payable {
-        if(msg.value <= 0) {
+        if (msg.value <= 0) {
             revert Allocation__ReceiveEthValueIsNull();
         }
 
@@ -235,7 +237,7 @@ contract GlobalAllocation is Ownable {
      * @return success Boolean indicating if the transfer was successful
      */
     function depositToken2(uint256 _amount) public returns (bool success) {
-        if (_amount <= 0 ) {
+        if (_amount <= 0) {
             revert Allocation__ReceiveToken2ValueIsNull();
         }
 
@@ -254,9 +256,13 @@ contract GlobalAllocation is Ownable {
      */
     function withdraw() external onlyOwner {
         (bool success,) = msg.sender.call{value: address(this).balance}("");
-        require(success, "Eth withdraw failed");
+        if (!success) {
+            revert Allocation__EthWithdrawFailed();
+        }
 
         success = IERC20Metadata(I_TOKEN2).transfer(msg.sender, IERC20Metadata(I_TOKEN2).balanceOf(address(this)));
-        require(success, "Token withdraw failed");
+        if (!success) {
+            revert Allocation__TokenWithdrawFailed();
+        }
     }
 }
