@@ -4,9 +4,10 @@ pragma solidity ^0.8.24;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {console2} from "forge-std/console2.sol";
 
-contract GlobalAllocation is Ownable {
+contract GlobalAllocation is Ownable, ReentrancyGuard {
     /* Errors */
     error Allocation__DesiredAllocationOutsideOfRange();
     error Allocation__RebalancePercentageOutsideOfRange();
@@ -254,7 +255,7 @@ contract GlobalAllocation is Ownable {
     /**
      * @dev Allow user to withdraw all funds from the contract
      */
-    function withdraw() external onlyOwner {
+    function withdraw() external onlyOwner nonReentrant {
         (bool success,) = msg.sender.call{value: address(this).balance}("");
         if (!success) {
             revert Allocation__EthWithdrawFailed();
