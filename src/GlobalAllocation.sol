@@ -24,14 +24,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     uint24 public rebalancePercentage; // percentage threshold of when to reset the allocation percentages
     uint24 public slippage;
 
-    /* Type Declarations */
-    enum AllocationState {
-        BALANCED,
-        AFTER_DEPOSIT,
-        AFTER_ETH_QUOTE,
-        CURRENT_ALLOCATION_PERCENTAGE_UPDATED
-    }
-
     /* State Variables */
     address private immutable I_TOKEN1; // Specify token1 address (ETH)
     address private immutable I_TOKEN2; // Specify token2 address (USDT)
@@ -43,7 +35,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     uint256 private sEthPriceInToken2; // Value of 1 Ether in terms of token2 according to Uniswap quote
     address[] private sToken1ToToken2Path;
     address[] private sToken2ToToken1Path;
-    AllocationState private sAllocationState;
 
     /* Events */
     event EthForToken(uint256 maxEthOut, uint256 minTokenIn);
@@ -89,8 +80,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     function quoteEthPriceInToken2() public {
         uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.getAmountsOut(1 ether, sToken1ToToken2Path);
         sEthPriceInToken2 = returnAmounts[1];
-        // Update state
-        sAllocationState = AllocationState.AFTER_ETH_QUOTE;
     }
 
     /**
@@ -130,9 +119,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         // console2.log("Contract token2 balance", IERC20Metadata(I_TOKEN2).balanceOf(address(this)));
         // console2.log("Total portfolio balnce in token2", sTotalPortfolioValueInToken2); // 6 decimals
         // console2.log("Eth To Token2 allocation percentage", currentEthToTokenAllocationPercentage); // 4 decimals
-
-        // Update State
-        sAllocationState = AllocationState.CURRENT_ALLOCATION_PERCENTAGE_UPDATED;
     }
 
     /**
@@ -227,9 +213,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         if (msg.value <= 0) {
             revert Allocation__ReceiveEthValueIsNull();
         }
-
-        // Setting post deposit state so the next re-balance uses Chainlink price feed instead of Uniswap quote
-        sAllocationState = AllocationState.AFTER_DEPOSIT;
     }
 
     /**
@@ -247,9 +230,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         if (!success) {
             revert Allocation__Token2DepositFailed();
         }
-
-        // Setting post deposit state so the next re-balance uses appropriate price feed
-        sAllocationState = AllocationState.AFTER_DEPOSIT;
     }
 
     /**
