@@ -20,5 +20,9 @@ lints = ["unsafe-typecast"]
 MAINNET_RPC_URL = "$MAINNET_RPC_URL"
 SEPOLIA_RPC_URL = "$SEPOLIA_RPC_URL"
 
+[profile.aidan]
+sender = "0x31fdeb452632cb502bf145b275e0f0d98c4732d6"
+tx_origin = "0x31fdeb452632cb502bf145b275e0f0d98c4732d6"
+
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

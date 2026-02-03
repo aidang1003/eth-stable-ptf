@@ -10,24 +10,32 @@ import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 contract GlobalAllocationTest is Test {
-    HelperConfig public helperConfig = new HelperConfig();
-    HelperConfig.NetworkConfig config = helperConfig.getConfig();
+    HelperConfig public helperConfig;
 
-    address public wethAddress = config.token1;
-    address public usdcAddress = config.token2;
-    address public uniswapV2Router02 = config.uniswapRouter;
+    address public wethAddress;
+    address public usdcAddress;
+    address public uniswapV2Router02;
 
     GlobalAllocation public globalAllocation;
-    IERC20 public token2 = IERC20(usdcAddress);
+    IERC20 public token2;
 
-    address public user = address(1);
+    address public user;
     uint256 public constant INITIAL_DEPOSIT = 1 ether;
 
     function setUp() public {
+        helperConfig = new HelperConfig();
+        HelperConfig.NetworkConfig memory config = helperConfig.getConfig();
+
+        wethAddress = config.token1;
+        usdcAddress = config.token2;
+        uniswapV2Router02 = config.uniswapRouter;
+        token2 = IERC20(usdcAddress);
+
+        user = config.senderAddress;
         vm.deal(user, 10 ether);
 
         DeployGlobalAllocation deployGlobalAllocation = new DeployGlobalAllocation();
-        globalAllocation = deployGlobalAllocation.deployContract(user);
+        globalAllocation = deployGlobalAllocation.deployContract();
 
         vm.startPrank(user);
 

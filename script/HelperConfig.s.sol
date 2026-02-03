@@ -37,6 +37,7 @@ contract HelperConfig is CodeConstants, Script {
         uint24 desiredEthallocationPercentage;
         uint24 rebalancePercentage;
         uint24 slippage;
+        address senderAddress;
     }
 
     mapping(uint256 => NetworkConfig) public networkConfigs;
@@ -63,25 +64,29 @@ contract HelperConfig is CodeConstants, Script {
         }
     }
 
-    function getMainnetEthConfig() public pure returns (NetworkConfig memory) {
+    function getMainnetEthConfig() public view returns (NetworkConfig memory) {
+        address senderAddress = vm.parseAddress(vm.envString("MAINNET_WALLET_ADDRESS"));
         return NetworkConfig({
             token1: WETH_MAINNET,
             token2: USDC_MAINNET,
             uniswapRouter: UNISWAP_V2_ROUTER02_MAINNET,
             desiredEthallocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
             rebalancePercentage: REBALANCE_PERCENTAGE,
-            slippage: SLIPPAGE_MAINNET
+            slippage: SLIPPAGE_MAINNET,
+            senderAddress: senderAddress
         });
     }
 
-    function getSepoliaEthConfig() public pure returns (NetworkConfig memory) {
+    function getSepoliaEthConfig() public view returns (NetworkConfig memory) {
+        address senderAddress = vm.parseAddress(vm.envString("SEPOLIA_WALLET_ADDRESS"));
         return NetworkConfig({
             token1: WETH_SEPOLIA,
             token2: USDC_SEPOLIA,
             uniswapRouter: UNISWAP_V2_ROUTER02_SEPOLIA,
             desiredEthallocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
             rebalancePercentage: REBALANCE_PERCENTAGE,
-            slippage: SLIPPAGE_SEPOLIA
+            slippage: SLIPPAGE_SEPOLIA,
+            senderAddress: senderAddress
         });
     }
 }

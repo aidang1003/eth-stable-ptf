@@ -9,14 +9,14 @@ contract DeployGlobalAllocation is Script {
     HelperConfig public helperConfig;
 
     function run() public {
-        deployContract(msg.sender);
+        deployContract();
     }
 
-    function deployContract(address _deployer) public returns (GlobalAllocation globalAllocation) {
+    function deployContract() public returns (GlobalAllocation globalAllocation) {
         helperConfig = new HelperConfig();
         HelperConfig.NetworkConfig memory config = helperConfig.getConfig();
 
-        vm.startBroadcast(_deployer);
+        vm.startBroadcast(config.senderAddress);
 
         globalAllocation = new GlobalAllocation({
             _token1: config.token1,
