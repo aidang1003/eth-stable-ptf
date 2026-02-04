@@ -19,16 +19,15 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     error Allocation__EthWithdrawFailed();
     error Allocation__TokenWithdrawFailed();
 
+    /* State Variables */
     uint24 public desiredEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
     uint24 public currentEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
     uint24 public rebalancePercentage; // percentage threshold of when to reset the allocation percentages
     uint24 public slippage;
-
-    /* State Variables */
-    address private immutable I_TOKEN1; // Specify token1 address (ETH)
-    address private immutable I_TOKEN2; // Specify token2 address (USDT)
-    uint8 private immutable I_TOKEN2_DECIMALS;
-    IUniswapV2Router02 private immutable I_UNISWAP_V2_ROUTER_02;
+    address public immutable I_TOKEN1; // Specify token1 address (ETH)
+    address public immutable I_TOKEN2; // Specify token2 address (USDT)
+    uint8 public immutable I_TOKEN2_DECIMALS;
+    IUniswapV2Router02 public immutable I_UNISWAP_V2_ROUTER_02;
 
     uint256 private sEthPortfolioBalanceInToken2;
     uint256 private sTotalPortfolioValueInToken2;
@@ -39,8 +38,11 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /* Events */
     event EthForToken(uint256 maxEthOut, uint256 minTokenIn);
     event TokenForEth(uint256 maxTokenOut, uint256 minEthIn);
-    event RebalncePerformed(uint256, uint24);
+    event RebalncePerformed(uint256 totalPortfolioValueInToken2, uint24 currentEthAllocationPercentage);
     event BalanceFundsCalled(address caller);
+    event EthDeposited(uint256 ethAmount);
+    event Token2Deposited(address token2Address, uint256 token2Amount);
+    event ethAndToken2Withdrawn(uint256 ethAmount, uint256 token2amount);
 
     constructor(
         address _token1,
@@ -213,6 +215,8 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         if (msg.value <= 0) {
             revert Allocation__ReceiveEthValueIsNull();
         }
+
+        emit EthDeposited(msg.value);
     }
 
     /**
@@ -230,20 +234,27 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         if (!success) {
             revert Allocation__Token2DepositFailed();
         }
+
+        emit Token2Deposited(I_TOKEN2, _amount);
     }
 
     /**
      * @dev Allow user to withdraw all funds from the contract
      */
     function withdraw() external onlyOwner nonReentrant {
-        (bool success,) = msg.sender.call{value: address(this).balance}("");
+        uint256 ethToWithdraw = address(this).balance;
+        uint256 token2ToWithdraw = IERC20Metadata(I_TOKEN2).balanceOf(address(this));
+
+        (bool success,) = msg.sender.call{value: ethToWithdraw}("");
         if (!success) {
             revert Allocation__EthWithdrawFailed();
         }
 
-        success = IERC20Metadata(I_TOKEN2).transfer(msg.sender, IERC20Metadata(I_TOKEN2).balanceOf(address(this)));
+        success = IERC20Metadata(I_TOKEN2).transfer(msg.sender, token2ToWithdraw);
         if (!success) {
             revert Allocation__TokenWithdrawFailed();
         }
+
+        emit ethAndToken2Withdrawn(ethToWithdraw, token2ToWithdraw);
     }
 }
