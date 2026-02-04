@@ -31,7 +31,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
 
     uint256 private sEthPortfolioBalanceInToken2;
     uint256 private sTotalPortfolioValueInToken2;
-    uint256 private sEthPriceInToken2; // Value of 1 Ether in terms of token2 according to Uniswap quote
     address[] private sToken1ToToken2Path;
     address[] private sToken2ToToken1Path;
 
@@ -79,16 +78,16 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      * The Chainlink value is to ensure that the Uniswap price quote is reasonable when performing a larger transaction
      * Use a Uniswap quote to get ETH value in token2 terms
      */
-    function quoteEthPriceInToken2() private {
+    function quoteEthPriceInToken2() private view returns (uint256 ethPriceInToken2) {
         uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.getAmountsOut(1 ether, sToken1ToToken2Path);
-        sEthPriceInToken2 = returnAmounts[1];
+        ethPriceInToken2 = returnAmounts[1];
     }
 
     /**
      * @dev Update Portfolio based on most recently quoted token2 value
      */
-    function updateCurrentAllocationPercentage() private {
-        sEthPortfolioBalanceInToken2 = sEthPriceInToken2 * address(this).balance / 1e18;
+    function updateCurrentAllocationPercentage(uint256 ethPriceInToken2) private {
+        sEthPortfolioBalanceInToken2 = ethPriceInToken2 * address(this).balance / 1e18;
         sTotalPortfolioValueInToken2 = sEthPortfolioBalanceInToken2 + IERC20Metadata(I_TOKEN2).balanceOf(address(this));
 
         if (address(this).balance == 0) {
@@ -115,7 +114,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         }
 
         emit RebalancePerformed(sTotalPortfolioValueInToken2, currentEthToTokenAllocationPercentage / 10000);
-        // console2.log("Eth price in token2", sEthPriceInToken2);
         // console2.log("Contract Eth balance", address(this).balance);
         // console2.log("Eth balance in token2", sEthPortfolioBalanceInToken2);
         // console2.log("Contract token2 balance", IERC20Metadata(I_TOKEN2).balanceOf(address(this)));
@@ -137,16 +135,16 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      */
     function balanceFunds() internal {
         // Get the most recent Eth quote
-        quoteEthPriceInToken2();
+        uint256 _ethPriceInToken2 = quoteEthPriceInToken2();
 
         // Update the current allocation percentage
-        updateCurrentAllocationPercentage();
+        updateCurrentAllocationPercentage({ethPriceInToken2: _ethPriceInToken2});
 
         // Logic for balancing funds
         if (currentEthToTokenAllocationPercentage < desiredEthToTokenAllocationPercentage) {
-            swapTokenForEth();
+            swapTokenForEth({ethPriceInToken2: _ethPriceInToken2});
         } else if (currentEthToTokenAllocationPercentage > desiredEthToTokenAllocationPercentage) {
-            swapEthForToken();
+            swapEthForToken({ethPriceInToken2: _ethPriceInToken2});
         } else {
             return;
         }
@@ -155,12 +153,12 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /**
      * @dev Swaps ETH for token address using Uniswap
      */
-    function swapEthForToken() internal {
+    function swapEthForToken(uint256 ethPriceInToken2) internal {
         uint256 minTokenToRecieve = (currentEthToTokenAllocationPercentage - desiredEthToTokenAllocationPercentage)
             * sTotalPortfolioValueInToken2 / (10 ** I_TOKEN2_DECIMALS);
 
         // Use quoted price to send set a max eth willing to pay for transaction to go through
-        uint256 maxEthToSend = (minTokenToRecieve * 1e18) / sEthPriceInToken2;
+        uint256 maxEthToSend = (minTokenToRecieve * 1e18) / ethPriceInToken2;
 
         // console2.log("Total Portfolio Value in Token2", sTotalPortfolioValueInToken2);
         // console2.log("Current allocation percentage", currentEthToTokenAllocationPercentage);
@@ -181,12 +179,12 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /**
      * @dev Swaps token for ETH using Uniswap
      */
-    function swapTokenForEth() internal {
+    function swapTokenForEth(uint256 ethPriceInToken2) internal {
         uint256 maxTokenToSend = (desiredEthToTokenAllocationPercentage - currentEthToTokenAllocationPercentage)
             * sTotalPortfolioValueInToken2 / (10 ** I_TOKEN2_DECIMALS);
 
         // Use quoted price to set a min eth received for transaction to go through
-        uint256 minEthToRecieve = (maxTokenToSend * 1e18) / sEthPriceInToken2;
+        uint256 minEthToRecieve = (maxTokenToSend * 1e18) / ethPriceInToken2;
 
         // console2.log("Total Portfolio Value in Token2", sTotalPortfolioValueInToken2);
         // console2.log("Current allocation percentage", currentEthToTokenAllocationPercentage);
