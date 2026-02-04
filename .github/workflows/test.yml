@@ -19,7 +19,7 @@ jobs:
       MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
       SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
       MAINNET_WALLET_ADDRESS: ${{ vars.MAINNET_WALLET_ADDRESS }}
-      SEPOLIA__WALLET_ADDRESS: ${{ vars.SEPOLIA__WALLET_ADDRESS }}
+      SEPOLIA_WALLET_ADDRESS: ${{ vars.SEPOLIA_WALLET_ADDRESS }}
     permissions:
       contents: read
     steps:
