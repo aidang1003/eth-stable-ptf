@@ -36,13 +36,13 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     address[] private sToken2ToToken1Path;
 
     /* Events */
-    event EthForToken(uint256 maxEthOut, uint256 minTokenIn);
-    event TokenForEth(uint256 maxTokenOut, uint256 minEthIn);
-    event RebalncePerformed(uint256 totalPortfolioValueInToken2, uint24 currentEthAllocationPercentage);
+    event SwappedEthForToken(uint256 maxEthOut, uint256 minTokenIn);
+    event SwappedTokenForEth(uint256 maxTokenOut, uint256 minEthIn);
+    event RebalancePerformed(uint256 totalPortfolioValueInToken2, uint24 currentEthAllocationPercentage);
     event BalanceFundsCalled(address caller);
     event EthDeposited(uint256 ethAmount);
     event Token2Deposited(address token2Address, uint256 token2Amount);
-    event ethAndToken2Withdrawn(uint256 ethAmount, uint256 token2amount);
+    event EthAndToken2Withdrawn(uint256 ethAmount, uint256 token2amount);
 
     constructor(
         address _token1,
@@ -114,7 +114,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
             }
         }
 
-        emit RebalncePerformed(sTotalPortfolioValueInToken2, currentEthToTokenAllocationPercentage / 10000);
+        emit RebalancePerformed(sTotalPortfolioValueInToken2, currentEthToTokenAllocationPercentage / 10000);
         // console2.log("Eth price in token2", sEthPriceInToken2);
         // console2.log("Contract Eth balance", address(this).balance);
         // console2.log("Eth balance in token2", sEthPortfolioBalanceInToken2);
@@ -175,7 +175,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
             deadline: block.timestamp + 15 minutes
         });
 
-        emit TokenForEth(returnAmounts[0], returnAmounts[1]);
+        emit SwappedEthForToken(returnAmounts[0], returnAmounts[1]);
     }
 
     /**
@@ -205,7 +205,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
             deadline: block.timestamp + 15 minutes
         });
 
-        emit TokenForEth(returnAmounts[0], returnAmounts[1]);
+        emit SwappedTokenForEth(returnAmounts[0], returnAmounts[1]);
     }
 
     /**
@@ -255,6 +255,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
             revert Allocation__TokenWithdrawFailed();
         }
 
-        emit ethAndToken2Withdrawn(ethToWithdraw, token2ToWithdraw);
+        emit EthAndToken2Withdrawn(ethToWithdraw, token2ToWithdraw);
     }
 }
