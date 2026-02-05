@@ -24,7 +24,7 @@ contract DeployGlobalAllocation is Script {
             _uniswapRouter: config.uniswapRouter,
             _desiredAllocationPercentage: config.desiredAllocationPercentage,
             _rebalanceThreshold: config.rebalanceThreshold,
-            _slippage: config.slippage
+            _slippagePercentage: config.slippagePercentage
         });
 
         vm.stopBroadcast();

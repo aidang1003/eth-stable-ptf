@@ -7,8 +7,8 @@ abstract contract CodeConstants {
     /* Global Allocation Deploy values */
     uint24 constant DESIRED_ETH_ALLOCATION_PERCENTAGE = 500000; // 50%
     uint24 constant REBALANCE_THRESHOLD = 40000; // 4%
-    uint24 constant SLIPPAGE_MAINNET = 10000; // 1%
-    uint24 constant SLIPPAGE_SEPOLIA = 200000; // 20%
+    uint24 constant SLIPPAGE_MAINNET = 6500; // .65%
+    uint24 constant SLIPPAGE_SEPOLIA = 130000; // 13%
 
     /* WETH Addresses */
     address constant WETH_MAINNET = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // WETH token address on Ethereum Mainnet
@@ -36,7 +36,7 @@ contract HelperConfig is CodeConstants, Script {
         address uniswapRouter;
         uint24 desiredAllocationPercentage;
         uint24 rebalanceThreshold;
-        uint24 slippage;
+        uint24 slippagePercentage;
         address senderAddress;
     }
 
@@ -72,7 +72,7 @@ contract HelperConfig is CodeConstants, Script {
             uniswapRouter: UNISWAP_V2_ROUTER02_MAINNET,
             desiredAllocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
             rebalanceThreshold: REBALANCE_THRESHOLD,
-            slippage: SLIPPAGE_MAINNET,
+            slippagePercentage: SLIPPAGE_MAINNET,
             senderAddress: senderAddress
         });
     }
@@ -85,7 +85,7 @@ contract HelperConfig is CodeConstants, Script {
             uniswapRouter: UNISWAP_V2_ROUTER02_SEPOLIA,
             desiredAllocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
             rebalanceThreshold: REBALANCE_THRESHOLD,
-            slippage: SLIPPAGE_SEPOLIA,
+            slippagePercentage: SLIPPAGE_SEPOLIA,
             senderAddress: senderAddress
         });
     }

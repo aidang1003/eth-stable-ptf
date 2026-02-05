@@ -23,7 +23,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     uint24 public sDesiredAllocationPercentage; // desired allocation percentage for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000
     uint24 public sCurrentAllocationPercentage;
     uint24 public sRebalanceThreshold; // threshold of when to reset the allocation percentages
-    uint24 public slippage;
+    uint24 public sSlippagePercentage;
     address public immutable I_TOKEN1; // token1 address (WETH)
     address public immutable I_TOKEN2; // token2 address
     IUniswapV2Router02 public immutable I_UNISWAP_V2_ROUTER_02;
@@ -43,7 +43,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         address _uniswapRouter,
         uint24 _desiredAllocationPercentage,
         uint24 _rebalanceThreshold,
-        uint24 _slippage
+        uint24 _slippagePercentage
     ) Ownable(msg.sender) {
         I_TOKEN1 = _token1;
         I_TOKEN2 = _token2;
@@ -51,7 +51,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         setDesiredAllocationPercentage(_desiredAllocationPercentage);
         setRebalanceThreshold(_rebalanceThreshold);
 
-        slippage = _slippage;
+        sSlippagePercentage = _slippagePercentage;
     }
 
     /**
@@ -216,7 +216,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
 
         uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.swapExactTokensForETH({
             amountIn: maxTokenToSend,
-            amountOutMin: (minEthToRecieve * (1e6 - slippage)) / 1e6,
+            amountOutMin: (minEthToRecieve * (1e6 - sSlippagePercentage)) / 1e6,
             path: token2ToToken1Path,
             to: address(this),
             deadline: block.timestamp + 15 minutes
