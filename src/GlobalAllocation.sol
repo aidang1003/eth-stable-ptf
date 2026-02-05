@@ -41,14 +41,14 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         address _token1,
         address _token2,
         address _uniswapRouter,
-        uint24 _sDesiredAllocationPercentage,
+        uint24 _desiredAllocationPercentage,
         uint24 _rebalanceThreshold,
         uint24 _slippage
     ) Ownable(msg.sender) {
         I_TOKEN1 = _token1;
         I_TOKEN2 = _token2;
         I_UNISWAP_V2_ROUTER_02 = IUniswapV2Router02(_uniswapRouter);
-        setDesiredAllocationPercentage(_sDesiredAllocationPercentage);
+        setDesiredAllocationPercentage(_desiredAllocationPercentage);
         setRebalanceThreshold(_rebalanceThreshold);
 
         slippage = _slippage;
