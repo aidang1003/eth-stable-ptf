@@ -34,7 +34,7 @@ contract HelperConfig is CodeConstants, Script {
         address token1;
         address token2;
         address uniswapRouter;
-        uint24 desiredEthallocationPercentage;
+        uint24 desiredAllocationPercentage;
         uint24 rebalanceThreshold;
         uint24 slippage;
         address senderAddress;
@@ -70,7 +70,7 @@ contract HelperConfig is CodeConstants, Script {
             token1: WETH_MAINNET,
             token2: USDC_MAINNET,
             uniswapRouter: UNISWAP_V2_ROUTER02_MAINNET,
-            desiredEthallocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
+            desiredAllocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
             rebalanceThreshold: REBALANCE_THRESHOLD,
             slippage: SLIPPAGE_MAINNET,
             senderAddress: senderAddress
@@ -83,7 +83,7 @@ contract HelperConfig is CodeConstants, Script {
             token1: WETH_SEPOLIA,
             token2: USDC_SEPOLIA,
             uniswapRouter: UNISWAP_V2_ROUTER02_SEPOLIA,
-            desiredEthallocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
+            desiredAllocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
             rebalanceThreshold: REBALANCE_THRESHOLD,
             slippage: SLIPPAGE_SEPOLIA,
             senderAddress: senderAddress
