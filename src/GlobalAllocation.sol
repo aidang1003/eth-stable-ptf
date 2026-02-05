@@ -26,7 +26,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     uint24 public slippage;
     address public immutable I_TOKEN1; // token1 address (WETH)
     address public immutable I_TOKEN2; // token2 address
-    uint8 public immutable I_TOKEN2_DECIMALS;
     IUniswapV2Router02 public immutable I_UNISWAP_V2_ROUTER_02;
 
     /* Events */
@@ -52,7 +51,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         setDesiredAllocationPercentage(_desiredEthToTokenAllocationPercentage);
         setRebalanceThreshold(_rebalanceThreshold);
 
-        I_TOKEN2_DECIMALS = IERC20Metadata(I_TOKEN2).decimals();
         slippage = _slippage;
     }
 
@@ -169,7 +167,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      */
     function swapEthForToken(uint256 ethPriceInToken2, uint256 totalPortfolioValueInToken2) internal {
         uint256 minTokenToRecieve = (currentEthToTokenAllocationPercentage - desiredEthToTokenAllocationPercentage)
-            * totalPortfolioValueInToken2 / (10 ** I_TOKEN2_DECIMALS);
+            * totalPortfolioValueInToken2 / (10 ** IERC20Metadata(I_TOKEN2).decimals());
 
         // Use quoted price to send set a max eth willing to pay for transaction to go through
         uint256 maxEthToSend = (minTokenToRecieve * 1e18) / ethPriceInToken2;
@@ -199,7 +197,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      */
     function swapTokenForEth(uint256 ethPriceInToken2, uint256 totalPortfolioValueInToken2) internal {
         uint256 maxTokenToSend = (desiredEthToTokenAllocationPercentage - currentEthToTokenAllocationPercentage)
-            * totalPortfolioValueInToken2 / (10 ** I_TOKEN2_DECIMALS);
+            * totalPortfolioValueInToken2 / (10 ** IERC20Metadata(I_TOKEN2).decimals());
 
         // Use quoted price to set a min eth received for transaction to go through
         uint256 minEthToRecieve = (maxTokenToSend * 1e18) / ethPriceInToken2;
