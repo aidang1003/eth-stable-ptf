@@ -9,13 +9,17 @@ on:
 
 env:
   FOUNDRY_PROFILE: ci
-  MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}   
-  SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}   
 
 jobs:
   check:
     name: Foundry project
     runs-on: ubuntu-latest
+    environment: solidity-dev-ops
+    env:
+      MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+      SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+      MAINNET_WALLET_ADDRESS: ${{ vars.MAINNET_WALLET_ADDRESS }}
+      SEPOLIA_WALLET_ADDRESS: ${{ vars.SEPOLIA_WALLET_ADDRESS }}
     permissions:
       contents: read
     steps:
