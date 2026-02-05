@@ -199,7 +199,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
             * totalPortfolioValueInToken2 / (10 ** IERC20Metadata(I_TOKEN2).decimals());
 
         // Use quoted price to set a min eth received for transaction to go through
-        uint256 minEthToRecieve = (maxTokenToSend * 1e18) / ethPriceInToken2;
+        uint256 minEthToRecieve = (maxTokenToSend * 1e18 * (1e6 - sSlippagePercentage)) / (1e6 * ethPriceInToken2);
 
         // console2.log("Total Portfolio Value in Token2", totalPortfolioValueInToken2);
         // console2.log("Current allocation percentage", sCurrentAllocationPercentage);
@@ -211,12 +211,12 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         IERC20Metadata(I_TOKEN2).approve(address(I_UNISWAP_V2_ROUTER_02), maxTokenToSend);
 
         address[] memory token2ToToken1Path = new address[](2);
-        token2ToToken1Path[1] = I_TOKEN1;
         token2ToToken1Path[0] = I_TOKEN2;
+        token2ToToken1Path[1] = I_TOKEN1;
 
         uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.swapExactTokensForETH({
             amountIn: maxTokenToSend,
-            amountOutMin: (minEthToRecieve * (1e6 - sSlippagePercentage)) / 1e6,
+            amountOutMin: minEthToRecieve,
             path: token2ToToken1Path,
             to: address(this),
             deadline: block.timestamp + 15 minutes
