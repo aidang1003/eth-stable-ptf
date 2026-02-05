@@ -20,9 +20,9 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     error Allocation__TokenWithdrawFailed();
 
     /* State Variables */
-    uint24 public desiredEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
-    uint24 public currentEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
-    uint24 public rebalancePercentage; // threshold of when to reset the allocation percentages
+    uint24 public desiredEthToTokenAllocationPercentage; // desired allocation percentage for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000
+    uint24 public currentEthToTokenAllocationPercentage;
+    uint24 public sRebalanceThreshold; // threshold of when to reset the allocation percentages
     uint24 public slippage;
     address public immutable I_TOKEN1; // token1 address (WETH)
     address public immutable I_TOKEN2; // token2 address
@@ -43,26 +43,37 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         address _token2,
         address _uniswapRouter,
         uint24 _desiredEthToTokenAllocationPercentage,
-        uint24 _rebalancePercentage,
+        uint24 _rebalanceThreshold,
         uint24 _slippage
     ) Ownable(msg.sender) {
-        // Allocation percentage must be between 1.0000% and 100.0000%
+        I_TOKEN1 = _token1;
+        I_TOKEN2 = _token2;
+        I_UNISWAP_V2_ROUTER_02 = IUniswapV2Router02(_uniswapRouter);
+        setDesiredAllocationPercentage(_desiredEthToTokenAllocationPercentage);
+        setRebalanceThreshold(_rebalanceThreshold);
+
+        I_TOKEN2_DECIMALS = IERC20Metadata(I_TOKEN2).decimals();
+        slippage = _slippage;
+    }
+
+    /**
+     * @dev sets desired allocation percentage
+     * @param _desiredEthToTokenAllocationPercentage 1.0000%-100.0000%
+     */
+    function setDesiredAllocationPercentage(uint24 _desiredEthToTokenAllocationPercentage) public {
         if (_desiredEthToTokenAllocationPercentage <= 1e4 || _desiredEthToTokenAllocationPercentage >= 1e6) {
             revert Allocation__DesiredAllocationOutsideOfRange();
         }
 
-        //Rebalance percentage must be between 0.1000% and 10.0000%
-        if (_rebalancePercentage <= 1e3 || _rebalancePercentage >= 1e5) {
+        desiredEthToTokenAllocationPercentage = _desiredEthToTokenAllocationPercentage;
+    }
+
+    function setRebalanceThreshold(uint24 _rebalanceThreshold) public {
+        if (_rebalanceThreshold <= 1e3 || _rebalanceThreshold >= 1e5) {
             revert Allocation__RebalancePercentageOutsideOfRange();
         }
 
-        I_TOKEN1 = _token1;
-        I_TOKEN2 = _token2;
-        I_UNISWAP_V2_ROUTER_02 = IUniswapV2Router02(_uniswapRouter);
-        desiredEthToTokenAllocationPercentage = _desiredEthToTokenAllocationPercentage;
-        rebalancePercentage = _rebalancePercentage;
-        slippage = _slippage;
-        I_TOKEN2_DECIMALS = IERC20Metadata(I_TOKEN2).decimals();
+        sRebalanceThreshold = _rebalanceThreshold;
     }
 
     /**
@@ -107,7 +118,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
                 (currentEthToTokenAllocationPercentage > desiredEthToTokenAllocationPercentage
                             ? currentEthToTokenAllocationPercentage - desiredEthToTokenAllocationPercentage
                             : desiredEthToTokenAllocationPercentage - currentEthToTokenAllocationPercentage)
-                    < rebalancePercentage
+                    < sRebalanceThreshold
             ) {
                 revert Allocation__ReAllocationNotNeeded();
             }

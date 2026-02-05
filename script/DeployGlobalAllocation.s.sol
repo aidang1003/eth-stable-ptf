@@ -23,7 +23,7 @@ contract DeployGlobalAllocation is Script {
             _token2: config.token2,
             _uniswapRouter: config.uniswapRouter,
             _desiredEthToTokenAllocationPercentage: config.desiredEthallocationPercentage,
-            _rebalancePercentage: config.rebalancePercentage,
+            _rebalanceThreshold: config.rebalanceThreshold,
             _slippage: config.slippage
         });
 
