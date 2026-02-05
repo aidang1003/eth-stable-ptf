@@ -20,20 +20,13 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     error Allocation__TokenWithdrawFailed();
 
     /* State Variables */
-    uint24 public desiredEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 1.0000%-100.0000%
-    uint24 public currentEthToTokenAllocationPercentage; // percentage allocation for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000, number 0%-100.0000%
-    uint24 public rebalancePercentage; // percentage threshold of when to reset the allocation percentages
-    uint24 public slippage;
-    address public immutable I_TOKEN1; // Specify token1 address (ETH)
-    address public immutable I_TOKEN2; // Specify token2 address (USDT)
-    uint8 public immutable I_TOKEN2_DECIMALS;
+    uint24 public sDesiredAllocationPercentage; // desired allocation percentage for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000
+    uint24 public sCurrentAllocationPercentage;
+    uint24 public sRebalanceThreshold; // threshold of when to reset the allocation percentages
+    uint24 public sSlippagePercentage;
+    address public immutable I_TOKEN1; // token1 address (WETH)
+    address public immutable I_TOKEN2; // token2 address
     IUniswapV2Router02 public immutable I_UNISWAP_V2_ROUTER_02;
-
-    uint256 private sEthPortfolioBalanceInToken2;
-    uint256 private sTotalPortfolioValueInToken2;
-    uint256 private sEthPriceInToken2; // Value of 1 Ether in terms of token2 according to Uniswap quote
-    address[] private sToken1ToToken2Path;
-    address[] private sToken2ToToken1Path;
 
     /* Events */
     event SwappedEthForToken(uint256 maxEthOut, uint256 minTokenIn);
@@ -48,29 +41,37 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         address _token1,
         address _token2,
         address _uniswapRouter,
-        uint24 _desiredEthToTokenAllocationPercentage,
-        uint24 _rebalancePercentage,
-        uint24 _slippage
+        uint24 _desiredAllocationPercentage,
+        uint24 _rebalanceThreshold,
+        uint24 _slippagePercentage
     ) Ownable(msg.sender) {
-        // Allocation percentage must be between 1.0000% and 100.0000%
-        if (_desiredEthToTokenAllocationPercentage <= 1e4 || _desiredEthToTokenAllocationPercentage >= 1e6) {
-            revert Allocation__DesiredAllocationOutsideOfRange();
-        }
-
-        //Rebalance percentage must be between 0.1000% and 10.0000%
-        if (_rebalancePercentage <= 1e3 || _rebalancePercentage >= 1e5) {
-            revert Allocation__RebalancePercentageOutsideOfRange();
-        }
-
         I_TOKEN1 = _token1;
         I_TOKEN2 = _token2;
         I_UNISWAP_V2_ROUTER_02 = IUniswapV2Router02(_uniswapRouter);
-        sToken1ToToken2Path = [I_TOKEN1, I_TOKEN2];
-        sToken2ToToken1Path = [I_TOKEN2, I_TOKEN1];
-        desiredEthToTokenAllocationPercentage = _desiredEthToTokenAllocationPercentage;
-        rebalancePercentage = _rebalancePercentage;
-        slippage = _slippage;
-        I_TOKEN2_DECIMALS = IERC20Metadata(I_TOKEN2).decimals();
+        setDesiredAllocationPercentage(_desiredAllocationPercentage);
+        setRebalanceThreshold(_rebalanceThreshold);
+
+        sSlippagePercentage = _slippagePercentage;
+    }
+
+    /**
+     * @dev sets desired allocation percentage
+     * @param _sDesiredAllocationPercentage 1.0000%-100.0000%
+     */
+    function setDesiredAllocationPercentage(uint24 _sDesiredAllocationPercentage) public {
+        if (_sDesiredAllocationPercentage <= 1e4 || _sDesiredAllocationPercentage >= 1e6) {
+            revert Allocation__DesiredAllocationOutsideOfRange();
+        }
+
+        sDesiredAllocationPercentage = _sDesiredAllocationPercentage;
+    }
+
+    function setRebalanceThreshold(uint24 _rebalanceThreshold) public {
+        if (_rebalanceThreshold <= 1e3 || _rebalanceThreshold >= 1e5) {
+            revert Allocation__RebalancePercentageOutsideOfRange();
+        }
+
+        sRebalanceThreshold = _rebalanceThreshold;
     }
 
     /**
@@ -79,48 +80,53 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      * The Chainlink value is to ensure that the Uniswap price quote is reasonable when performing a larger transaction
      * Use a Uniswap quote to get ETH value in token2 terms
      */
-    function quoteEthPriceInToken2() private {
-        uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.getAmountsOut(1 ether, sToken1ToToken2Path);
-        sEthPriceInToken2 = returnAmounts[1];
+    function quoteEthPriceInToken2() private view returns (uint256 ethPriceInToken2) {
+        address[] memory token1ToToken2Path = new address[](2);
+        token1ToToken2Path[0] = I_TOKEN1;
+        token1ToToken2Path[1] = I_TOKEN2;
+
+        uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.getAmountsOut(1 ether, token1ToToken2Path);
+        ethPriceInToken2 = returnAmounts[1];
     }
 
     /**
      * @dev Update Portfolio based on most recently quoted token2 value
      */
-    function updateCurrentAllocationPercentage() private {
-        sEthPortfolioBalanceInToken2 = sEthPriceInToken2 * address(this).balance / 1e18;
-        sTotalPortfolioValueInToken2 = sEthPortfolioBalanceInToken2 + IERC20Metadata(I_TOKEN2).balanceOf(address(this));
+    function updateCurrentAllocationPercentage(uint256 ethPriceInToken2)
+        private
+        returns (uint256 totalPortfolioValueInToken2)
+    {
+        uint256 ethPortfolioBalanceInToken2 = ethPriceInToken2 * address(this).balance / 1e18;
+        totalPortfolioValueInToken2 = ethPortfolioBalanceInToken2 + IERC20Metadata(I_TOKEN2).balanceOf(address(this));
 
         if (address(this).balance == 0) {
-            currentEthToTokenAllocationPercentage = 0;
-            return;
+            sCurrentAllocationPercentage = 0;
+            return totalPortfolioValueInToken2;
         } else {
-            if (sEthPortfolioBalanceInToken2 * 1e6 / sTotalPortfolioValueInToken2 > type(uint24).max) {
+            if (ethPortfolioBalanceInToken2 * 1e6 / totalPortfolioValueInToken2 > type(uint24).max) {
                 revert Allocation__OverflowUpdatingCurrentAllocation();
             }
             // casting to 'uint24' is safe because revert-error statement above ensures value ≤ type(uint24).max
-            currentEthToTokenAllocationPercentage =
+            sCurrentAllocationPercentage =
             // forge-lint: disable-next-line(unsafe-typecast)
-            uint24(sEthPortfolioBalanceInToken2 * 1e6 / sTotalPortfolioValueInToken2);
-            // console2.log("Current Eth Allocation Percentage:", currentEthToTokenAllocationPercentage);
-            // console2.log("Desired Eth Allocation Percentage:", desiredEthToTokenAllocationPercentage);
+            uint24(ethPortfolioBalanceInToken2 * 1e6 / totalPortfolioValueInToken2);
+            // console2.log("Current Eth Allocation Percentage:", sCurrentAllocationPercentage);
+            // console2.log("Desired Eth Allocation Percentage:", sDesiredAllocationPercentage);
             if (
-                (currentEthToTokenAllocationPercentage > desiredEthToTokenAllocationPercentage
-                            ? currentEthToTokenAllocationPercentage - desiredEthToTokenAllocationPercentage
-                            : desiredEthToTokenAllocationPercentage - currentEthToTokenAllocationPercentage)
-                    < rebalancePercentage
+                (sCurrentAllocationPercentage > sDesiredAllocationPercentage
+                            ? sCurrentAllocationPercentage - sDesiredAllocationPercentage
+                            : sDesiredAllocationPercentage - sCurrentAllocationPercentage) < sRebalanceThreshold
             ) {
                 revert Allocation__ReAllocationNotNeeded();
             }
         }
 
-        emit RebalancePerformed(sTotalPortfolioValueInToken2, currentEthToTokenAllocationPercentage / 10000);
-        // console2.log("Eth price in token2", sEthPriceInToken2);
+        emit RebalancePerformed(totalPortfolioValueInToken2, sCurrentAllocationPercentage / 10000);
         // console2.log("Contract Eth balance", address(this).balance);
-        // console2.log("Eth balance in token2", sEthPortfolioBalanceInToken2);
+        // console2.log("Eth balance in token2", ethPortfolioBalanceInToken2);
         // console2.log("Contract token2 balance", IERC20Metadata(I_TOKEN2).balanceOf(address(this)));
-        // console2.log("Total portfolio balnce in token2", sTotalPortfolioValueInToken2); // 6 decimals
-        // console2.log("Eth To Token2 allocation percentage", currentEthToTokenAllocationPercentage); // 4 decimals
+        // console2.log("Total portfolio balnce in token2", totalPortfolioValueInToken2); // 6 decimals
+        // console2.log("Eth To Token2 allocation percentage", sCurrentAllocationPercentage); // 4 decimals
     }
 
     /**
@@ -133,20 +139,23 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
 
     /**
      * @dev Balances funds based on desired allocation percentage
-     * Only needs to be called once at the contract creation
      */
     function balanceFunds() internal {
         // Get the most recent Eth quote
-        quoteEthPriceInToken2();
+        uint256 _ethPriceInToken2 = quoteEthPriceInToken2();
 
         // Update the current allocation percentage
-        updateCurrentAllocationPercentage();
+        uint256 _totalPortfolioValueInToken2 = updateCurrentAllocationPercentage({ethPriceInToken2: _ethPriceInToken2});
 
         // Logic for balancing funds
-        if (currentEthToTokenAllocationPercentage < desiredEthToTokenAllocationPercentage) {
-            swapTokenForEth();
-        } else if (currentEthToTokenAllocationPercentage > desiredEthToTokenAllocationPercentage) {
-            swapEthForToken();
+        if (sCurrentAllocationPercentage < sDesiredAllocationPercentage) {
+            swapTokenForEth({
+                ethPriceInToken2: _ethPriceInToken2, totalPortfolioValueInToken2: _totalPortfolioValueInToken2
+            });
+        } else if (sCurrentAllocationPercentage > sDesiredAllocationPercentage) {
+            swapEthForToken({
+                ethPriceInToken2: _ethPriceInToken2, totalPortfolioValueInToken2: _totalPortfolioValueInToken2
+            });
         } else {
             return;
         }
@@ -155,22 +164,26 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /**
      * @dev Swaps ETH for token address using Uniswap
      */
-    function swapEthForToken() internal {
-        uint256 minTokenToRecieve = (currentEthToTokenAllocationPercentage - desiredEthToTokenAllocationPercentage)
-            * sTotalPortfolioValueInToken2 / (10 ** I_TOKEN2_DECIMALS);
+    function swapEthForToken(uint256 ethPriceInToken2, uint256 totalPortfolioValueInToken2) internal {
+        uint256 minTokenToRecieve = (sCurrentAllocationPercentage - sDesiredAllocationPercentage)
+            * totalPortfolioValueInToken2 / (10 ** IERC20Metadata(I_TOKEN2).decimals());
 
         // Use quoted price to send set a max eth willing to pay for transaction to go through
-        uint256 maxEthToSend = (minTokenToRecieve * 1e18) / sEthPriceInToken2;
+        uint256 maxEthToSend = (minTokenToRecieve * 1e18) / ethPriceInToken2;
 
-        // console2.log("Total Portfolio Value in Token2", sTotalPortfolioValueInToken2);
-        // console2.log("Current allocation percentage", currentEthToTokenAllocationPercentage);
-        // console2.log("Desired allocation percentage", desiredEthToTokenAllocationPercentage);
+        // console2.log("Total Portfolio Value in Token2", totalPortfolioValueInToken2);
+        // console2.log("Current allocation percentage", sCurrentAllocationPercentage);
+        // console2.log("Desired allocation percentage", sDesiredAllocationPercentage);
         // console2.log("Max Eth to send", maxEthToSend);
         // console2.log("Min token to receive", minTokenToRecieve);
 
+        address[] memory token1ToToken2Path = new address[](2);
+        token1ToToken2Path[0] = I_TOKEN1;
+        token1ToToken2Path[1] = I_TOKEN2;
+
         uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.swapExactETHForTokens{value: maxEthToSend}({
             amountOutMin: minTokenToRecieve,
-            path: sToken1ToToken2Path,
+            path: token1ToToken2Path,
             to: address(this),
             deadline: block.timestamp + 15 minutes
         });
@@ -181,26 +194,30 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /**
      * @dev Swaps token for ETH using Uniswap
      */
-    function swapTokenForEth() internal {
-        uint256 maxTokenToSend = (desiredEthToTokenAllocationPercentage - currentEthToTokenAllocationPercentage)
-            * sTotalPortfolioValueInToken2 / (10 ** I_TOKEN2_DECIMALS);
+    function swapTokenForEth(uint256 ethPriceInToken2, uint256 totalPortfolioValueInToken2) internal {
+        uint256 maxTokenToSend = (sDesiredAllocationPercentage - sCurrentAllocationPercentage)
+            * totalPortfolioValueInToken2 / (10 ** IERC20Metadata(I_TOKEN2).decimals());
 
         // Use quoted price to set a min eth received for transaction to go through
-        uint256 minEthToRecieve = (maxTokenToSend * 1e18) / sEthPriceInToken2;
+        uint256 minEthToRecieve = (maxTokenToSend * 1e18 * (1e6 - sSlippagePercentage)) / (1e6 * ethPriceInToken2);
 
-        // console2.log("Total Portfolio Value in Token2", sTotalPortfolioValueInToken2);
-        // console2.log("Current allocation percentage", currentEthToTokenAllocationPercentage);
-        // console2.log("Desired allocation percentage", desiredEthToTokenAllocationPercentage);
+        // console2.log("Total Portfolio Value in Token2", totalPortfolioValueInToken2);
+        // console2.log("Current allocation percentage", sCurrentAllocationPercentage);
+        // console2.log("Desired allocation percentage", sDesiredAllocationPercentage);
         // console2.log("Max token to send", maxTokenToSend);
         // console2.log("Min Eth to receive", minEthToRecieve);
 
         // Approve Uniswap router to spend USDC
         IERC20Metadata(I_TOKEN2).approve(address(I_UNISWAP_V2_ROUTER_02), maxTokenToSend);
 
+        address[] memory token2ToToken1Path = new address[](2);
+        token2ToToken1Path[0] = I_TOKEN2;
+        token2ToToken1Path[1] = I_TOKEN1;
+
         uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.swapExactTokensForETH({
             amountIn: maxTokenToSend,
-            amountOutMin: (minEthToRecieve * (1e6 - slippage)) / 1e6,
-            path: sToken2ToToken1Path,
+            amountOutMin: minEthToRecieve,
+            path: token2ToToken1Path,
             to: address(this),
             deadline: block.timestamp + 15 minutes
         });

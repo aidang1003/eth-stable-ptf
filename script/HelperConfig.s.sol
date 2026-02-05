@@ -6,9 +6,9 @@ import {Script} from "forge-std/Script.sol";
 abstract contract CodeConstants {
     /* Global Allocation Deploy values */
     uint24 constant DESIRED_ETH_ALLOCATION_PERCENTAGE = 500000; // 50%
-    uint24 constant REBALANCE_PERCENTAGE = 40000; // 4%
-    uint24 constant SLIPPAGE_MAINNET = 10000; // 1%
-    uint24 constant SLIPPAGE_SEPOLIA = 200000; // 20%
+    uint24 constant REBALANCE_THRESHOLD = 40000; // 4%
+    uint24 constant SLIPPAGE_MAINNET = 6500; // .65%
+    uint24 constant SLIPPAGE_SEPOLIA = 130000; // 13%
 
     /* WETH Addresses */
     address constant WETH_MAINNET = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // WETH token address on Ethereum Mainnet
@@ -34,9 +34,9 @@ contract HelperConfig is CodeConstants, Script {
         address token1;
         address token2;
         address uniswapRouter;
-        uint24 desiredEthallocationPercentage;
-        uint24 rebalancePercentage;
-        uint24 slippage;
+        uint24 desiredAllocationPercentage;
+        uint24 rebalanceThreshold;
+        uint24 slippagePercentage;
         address senderAddress;
     }
 
@@ -70,9 +70,9 @@ contract HelperConfig is CodeConstants, Script {
             token1: WETH_MAINNET,
             token2: USDC_MAINNET,
             uniswapRouter: UNISWAP_V2_ROUTER02_MAINNET,
-            desiredEthallocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
-            rebalancePercentage: REBALANCE_PERCENTAGE,
-            slippage: SLIPPAGE_MAINNET,
+            desiredAllocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
+            rebalanceThreshold: REBALANCE_THRESHOLD,
+            slippagePercentage: SLIPPAGE_MAINNET,
             senderAddress: senderAddress
         });
     }
@@ -83,9 +83,9 @@ contract HelperConfig is CodeConstants, Script {
             token1: WETH_SEPOLIA,
             token2: USDC_SEPOLIA,
             uniswapRouter: UNISWAP_V2_ROUTER02_SEPOLIA,
-            desiredEthallocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
-            rebalancePercentage: REBALANCE_PERCENTAGE,
-            slippage: SLIPPAGE_SEPOLIA,
+            desiredAllocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
+            rebalanceThreshold: REBALANCE_THRESHOLD,
+            slippagePercentage: SLIPPAGE_SEPOLIA,
             senderAddress: senderAddress
         });
     }
