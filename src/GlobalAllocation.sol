@@ -22,11 +22,13 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /* State Variables */
     uint24 public sDesiredAllocationPercentage; // desired allocation percentage for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000
     uint24 public sCurrentAllocationPercentage;
-    uint24 public sRebalanceThreshold; // threshold of when to reset the allocation percentages
+    uint24 public sRebalanceThreshold; // threshold between current and desired allocation for rebalancing
+    uint24 public sUpdateAllocationThreshold; // threshold for adjusting desired allocation percentages
     uint24 public sSlippagePercentage;
     address public immutable I_TOKEN1; // token1 address (WETH)
     address public immutable I_TOKEN2; // token2 address
     IUniswapV2Router02 public immutable I_UNISWAP_V2_ROUTER_02;
+    uint256 private sEthPrice; // Only set when this minus current eth price is outside of sUpdateAllocationThreshold
 
     /* Events */
     event SwappedEthForToken(uint256 maxEthOut, uint256 minTokenIn);
@@ -79,14 +81,22 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      * If immediatley after deposit use ChainLink Pricefeed to get ETH value in token2 terms
      * The Chainlink value is to ensure that the Uniswap price quote is reasonable when performing a larger transaction
      * Use a Uniswap quote to get ETH value in token2 terms
+     * Add Eth Price to a state variable if outside of threshold
      */
-    function quoteEthPriceInToken2() private view returns (uint256 ethPriceInToken2) {
+    function quoteEthPriceInToken2() private returns (uint256 ethPriceInToken2) {
         address[] memory token1ToToken2Path = new address[](2);
         token1ToToken2Path[0] = I_TOKEN1;
         token1ToToken2Path[1] = I_TOKEN2;
 
         uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.getAmountsOut(1 ether, token1ToToken2Path);
         ethPriceInToken2 = returnAmounts[1];
+
+        // gets shotty setting eth price using ethPrice in Token 2 because could have a price outsdie of threshold
+        // Does not re-balance as tight. While not the vision is potentially more profitable
+        uint256 priceDiff = ethPriceInToken2 > sEthPrice ? ethPriceInToken2 - sEthPrice : sEthPrice - ethPriceInToken2;
+        if (priceDiff * 1e6 / ethPriceInToken2 > sUpdateAllocationThreshold) {
+            sEthPrice = ethPriceInToken2;
+        }
     }
 
     /**
