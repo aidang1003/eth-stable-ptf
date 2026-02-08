@@ -8,7 +8,7 @@ abstract contract CodeConstants {
     uint24 constant DESIRED_ETH_ALLOCATION_PERCENTAGE = 500000; // 50%
     uint24 constant REBALANCE_THRESHOLD = 40000; // 4%
     uint24 constant SLIPPAGE_MAINNET = 6500; // .65%
-    uint24 constant SLIPPAGE_SEPOLIA = 130000; // 13%
+    uint24 constant SLIPPAGE_SEPOLIA = 50000; // 5%
 
     /* WETH Addresses */
     address constant WETH_MAINNET = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // WETH token address on Ethereum Mainnet
