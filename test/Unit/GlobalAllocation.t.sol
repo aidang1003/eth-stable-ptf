@@ -253,30 +253,48 @@ contract GlobalAllocationTest is Test {
 
         vm.stopPrank();
 
+        // Query actual pool reserves to derive a realistic whale swap amount
+        IUniswapV2Router02 router = IUniswapV2Router02(uniswapV2Router02);
+        address factory = router.factory();
+        address pair = IUniswapV2Factory(factory).getPair(wethAddress, usdcAddress);
+        (uint112 reserve0, uint112 reserve1,) = IUniswapV2Pair(pair).getReserves();
+
+        // Determine which reserve is WETH (token0 is the lower address)
+        uint256 wethReserve = IUniswapV2Pair(pair).token0() == wethAddress
+            ? uint256(reserve0)
+            : uint256(reserve1);
+
+        // Use 30% of pool's WETH reserve — enough to meaningfully crash price
+        // while staying within realistic liquidity bounds on any network
+        uint256 whaleSwapAmount = wethReserve * 30 / 100;
+        require(whaleSwapAmount > 0, "Pool has no WETH liquidity");
+
         // Manipulate the Uniswap pool to decrease ETH price
-        // Have a whale swap a large amount of ETH for USDC to crash ETH price
         address whale = address(0x999);
-        vm.deal(whale, 1000 ether);
+        vm.deal(whale, whaleSwapAmount * 2);
 
         vm.startPrank(whale);
 
         // Get WETH for the whale
-        (bool success,) = wethAddress.call{value: 500 ether}("");
+        (bool success,) = wethAddress.call{value: whaleSwapAmount}("");
         require(success, "WETH deposit failed");
 
         // Approve Uniswap router to spend whale's WETH
-        IERC20(wethAddress).approve(uniswapV2Router02, 500 ether);
+        IERC20(wethAddress).approve(uniswapV2Router02, whaleSwapAmount);
 
         // Build path for swap
         address[] memory path = new address[](2);
         path[0] = wethAddress;
         path[1] = usdcAddress;
 
-        // Whale swaps 500 ETH for USDC, crashing ETH price
-        IUniswapV2Router02(uniswapV2Router02)
-            .swapExactTokensForTokens({
-                amountIn: 500 ether, amountOutMin: 0, path: path, to: whale, deadline: block.timestamp + 15 minutes
-            });
+        // Whale swaps a portion of pool liquidity for USDC, crashing ETH price
+        router.swapExactTokensForTokens({
+            amountIn: whaleSwapAmount,
+            amountOutMin: 0,
+            path: path,
+            to: whale,
+            deadline: block.timestamp + 15 minutes
+        });
 
         vm.stopPrank();
 
