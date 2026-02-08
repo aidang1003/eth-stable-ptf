@@ -22,6 +22,8 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /* State Variables */
     uint24 public sDesiredAllocationPercentage; // desired allocation percentage for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000
     uint24 public sCurrentAllocationPercentage;
+    uint256 public sEthPriceMax; // At this Eth price or below hold 100% ETH
+    uint256 public sEthPriceMin; // At this Eth price or above hold 100% of a stable token
     uint24 public sRebalanceThreshold; // threshold between current and desired allocation for rebalancing
     uint24 public sUpdateAllocationThreshold; // threshold for adjusting desired allocation percentages
     uint24 public sSlippagePercentage;
