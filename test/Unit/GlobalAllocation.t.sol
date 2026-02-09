@@ -260,9 +260,7 @@ contract GlobalAllocationTest is Test {
         (uint112 reserve0, uint112 reserve1,) = IUniswapV2Pair(pair).getReserves();
 
         // Determine which reserve is WETH (token0 is the lower address)
-        uint256 wethReserve = IUniswapV2Pair(pair).token0() == wethAddress
-            ? uint256(reserve0)
-            : uint256(reserve1);
+        uint256 wethReserve = IUniswapV2Pair(pair).token0() == wethAddress ? uint256(reserve0) : uint256(reserve1);
 
         // Use 30% of pool's WETH reserve — enough to meaningfully crash price
         // while staying within realistic liquidity bounds on any network
@@ -289,11 +287,7 @@ contract GlobalAllocationTest is Test {
 
         // Whale swaps a portion of pool liquidity for USDC, crashing ETH price
         router.swapExactTokensForTokens({
-            amountIn: whaleSwapAmount,
-            amountOutMin: 0,
-            path: path,
-            to: whale,
-            deadline: block.timestamp + 15 minutes
+            amountIn: whaleSwapAmount, amountOutMin: 0, path: path, to: whale, deadline: block.timestamp + 15 minutes
         });
 
         vm.stopPrank();
