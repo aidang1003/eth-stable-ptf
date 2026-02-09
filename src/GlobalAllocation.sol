@@ -5,6 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import {UD60x18} from "@prb-math/UD60x18.sol";
 // import {console2} from "forge-std/console2.sol";
 
 contract GlobalAllocation is Ownable, ReentrancyGuard {
@@ -83,10 +84,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         setDesiredAllocationPercentage(uint24(_desiredAllocationPercentage));
     }
 
-    /**
-     * @dev sets desired allocation percentage
-     * @param _desiredAllocationPercentage uint24 0.0000%-100.0000%
-     */
     function setDesiredAllocationPercentage(uint24 _desiredAllocationPercentage) public {
         if (_desiredAllocationPercentage <= 0 || _desiredAllocationPercentage >= 1e6) {
             revert Allocation__Uint24DesiredAllocationOutsideOfRange();
@@ -95,6 +92,10 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         sDesiredAllocationPercentage = _desiredAllocationPercentage;
     }
 
+    /**
+     * @dev sets current allocation percentage
+     * @param _currentAllocationPercentage uint256 0.0000%-100.0000%
+     */
     function setCurrentAllocationPercentageUint256(uint256 _currentAllocationPercentage) public {
         if (_currentAllocationPercentage > type(uint24).max) {
             revert Allocation__OverflowUpdatingCurrentAllocation();
@@ -131,8 +132,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.getAmountsOut(1 ether, token1ToToken2Path);
         ethPriceInToken2 = returnAmounts[1];
 
-        // gets shotty setting eth price using ethPrice in Token 2 because could have a price outsdie of threshold
-        // Does not re-balance as tight. While not the vision is potentially more profitable
         uint256 priceDiff = ethPriceInToken2 > sEthPrice ? ethPriceInToken2 - sEthPrice : sEthPrice - ethPriceInToken2;
         if (priceDiff * 1e6 / ethPriceInToken2 > sUpdateAllocationThreshold) {
             sEthPrice = ethPriceInToken2;
@@ -182,8 +181,10 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     function updateDesiredAllocationPercentage(uint256 _ethPriceinToken2) public returns (uint256 desiredAllocation) {
         if (_ethPriceinToken2 < sEthPriceMin) {
             desiredAllocation = 1e6; //100%
+        } else if (_ethPriceinToken2 > sEthPriceMax) {
+            desiredAllocation = 0; //0%
         } else {
-            desiredAllocation = 1 - ((_ethPriceinToken2 - sEthPriceMin) / (sEthPriceMax - sEthPriceMin)) ** I_FACTOR;
+            desiredAllocation = 1e6 - ((_ethPriceinToken2 - sEthPriceMin) / (sEthPriceMax - sEthPriceMin)) ** I_FACTOR;
         }
         setDesiredAllocationPercentageUint256(desiredAllocation);
     }
