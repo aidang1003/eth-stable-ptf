@@ -153,18 +153,18 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
             sCurrentAllocationPercentage = 0;
         } else {
             uint256 currentAllocationPercentage = ethPortfolioBalanceInToken2 * 1e6 / totalPortfolioValueInToken2;
-            setCurrentAllocationPercentageUint256(currentAllocationPercentage);
 
             // console2.log("Current Eth Allocation Percentage:", sCurrentAllocationPercentage);
             // console2.log("Desired Eth Allocation Percentage:", sDesiredAllocationPercentage);
 
             if (
-                (sCurrentAllocationPercentage > sDesiredAllocationPercentage
-                            ? sCurrentAllocationPercentage - sDesiredAllocationPercentage
-                            : sDesiredAllocationPercentage - sCurrentAllocationPercentage) < sRebalanceThreshold
+                (currentAllocationPercentage > sDesiredAllocationPercentage
+                            ? currentAllocationPercentage - sDesiredAllocationPercentage
+                            : sDesiredAllocationPercentage - currentAllocationPercentage) < sRebalanceThreshold
             ) {
                 revert Allocation__ReAllocationNotNeeded();
             }
+            setCurrentAllocationPercentageUint256(currentAllocationPercentage);
         }
 
         emit RebalancePerformed(totalPortfolioValueInToken2, sCurrentAllocationPercentage / 10000);
