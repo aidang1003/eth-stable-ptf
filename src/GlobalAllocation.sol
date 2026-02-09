@@ -5,8 +5,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
-import {UD60x18} from "@prb-math/UD60x18.sol";
-// import {console2} from "forge-std/console2.sol";
+import {UD60x18, ud} from "@prb-math/UD60x18.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract GlobalAllocation is Ownable, ReentrancyGuard {
     /* Errors */
@@ -184,7 +184,13 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         } else if (_ethPriceinToken2 > sEthPriceMax) {
             desiredAllocation = 0; //0%
         } else {
-            desiredAllocation = 1e6 - ((_ethPriceinToken2 - sEthPriceMin) / (sEthPriceMax - sEthPriceMin)) ** I_FACTOR;
+            UD60x18 priceRatio = ud((_ethPriceinToken2 - sEthPriceMin) / (sEthPriceMax - sEthPriceMin));
+            UD60x18 exponent = ud(I_FACTOR);
+            UD60x18 powered = priceRatio.pow(exponent);
+
+            uint256 poweredUnwrap = powered.unwrap();
+            console2.log("Powered Unwrap", poweredUnwrap);
+            desiredAllocation = 1e18 - poweredUnwrap;
         }
         setDesiredAllocationPercentageUint256(desiredAllocation);
     }
@@ -202,19 +208,21 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      */
     function balanceFunds() internal {
         // Get the most recent Eth quote
-        uint256 _ethPriceInToken2 = quoteEthPriceInToken2();
+        uint256 ethPriceInToken2 = quoteEthPriceInToken2();
+
+        updateDesiredAllocationPercentage(ethPriceInToken2);
 
         // Update the current allocation percentage
-        uint256 _totalPortfolioValueInToken2 = updateCurrentAllocationPercentage({ethPriceInToken2: _ethPriceInToken2});
+        uint256 _totalPortfolioValueInToken2 = updateCurrentAllocationPercentage({ethPriceInToken2: ethPriceInToken2});
 
         // Logic for balancing funds
         if (sCurrentAllocationPercentage < sDesiredAllocationPercentage) {
             swapTokenForEth({
-                ethPriceInToken2: _ethPriceInToken2, totalPortfolioValueInToken2: _totalPortfolioValueInToken2
+                ethPriceInToken2: ethPriceInToken2, totalPortfolioValueInToken2: _totalPortfolioValueInToken2
             });
         } else if (sCurrentAllocationPercentage > sDesiredAllocationPercentage) {
             swapEthForToken({
-                ethPriceInToken2: _ethPriceInToken2, totalPortfolioValueInToken2: _totalPortfolioValueInToken2
+                ethPriceInToken2: ethPriceInToken2, totalPortfolioValueInToken2: _totalPortfolioValueInToken2
             });
         } else {
             return;
