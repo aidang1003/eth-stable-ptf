@@ -24,7 +24,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /* State Variables */
     uint24 public sDesiredAllocationPercentage; // desired allocation percentage for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000
     uint24 public sCurrentAllocationPercentage;
-    uint256 private sEthPrice; // Only set when this minus current eth price is outside of sUpdateAllocationThreshold
+    uint256 public sEthPrice; // Only set when this minus current eth price is outside of sUpdateAllocationThreshold
     uint256 public sEthPriceMax; // At this Eth price or below hold 100% ETH
     uint256 public sEthPriceMin; // At this Eth price or above hold 100% of a stable token
     uint24 public sRebalanceThreshold; // threshold between current and desired allocation for rebalancing
@@ -104,10 +104,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Updates the current allocation percentage based on Uniswap quoted Eth price
-     * If immediatley after deposit use ChainLink Pricefeed to get ETH value in token2 terms
-     * The Chainlink value is to ensure that the Uniswap price quote is reasonable when performing a larger transaction
-     * Use a Uniswap quote to get ETH value in token2 terms
+     * @dev Use a Uniswap quote to get ETH value in token2 terms
      * Add Eth Price to a state variable if outside of threshold
      */
     function quoteEthPriceInToken2() private returns (uint256 ethPriceInToken2) {
