@@ -9,6 +9,9 @@ abstract contract CodeConstants {
     uint24 constant REBALANCE_THRESHOLD = 40000; // 4%
     uint24 constant SLIPPAGE_MAINNET = 6500; // .65%
     uint24 constant SLIPPAGE_SEPOLIA = 50000; // 5%
+    uint256 constant ETH_PRICE_MIN = 1000000000; // $1000 w/ 6 decimals
+    uint256 constant ETH_PRICE_MAX = 8000000000; // $8000 w/ 6 decimals
+    uint24 constant FACTOR = 15000; // 1.5000
 
     /* WETH Addresses */
     address constant WETH_MAINNET = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // WETH token address on Ethereum Mainnet
@@ -38,6 +41,9 @@ contract HelperConfig is CodeConstants, Script {
         uint24 rebalanceThreshold;
         uint24 slippagePercentage;
         address senderAddress;
+        uint256 ethPriceMin;
+        uint256 ethPriceMax;
+        uint24 factor;
     }
 
     mapping(uint256 => NetworkConfig) public networkConfigs;
@@ -73,7 +79,10 @@ contract HelperConfig is CodeConstants, Script {
             desiredAllocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
             rebalanceThreshold: REBALANCE_THRESHOLD,
             slippagePercentage: SLIPPAGE_MAINNET,
-            senderAddress: senderAddress
+            senderAddress: senderAddress,
+            ethPriceMin: ETH_PRICE_MIN,
+            ethPriceMax: ETH_PRICE_MAX,
+            factor: FACTOR
         });
     }
 
@@ -86,7 +95,10 @@ contract HelperConfig is CodeConstants, Script {
             desiredAllocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
             rebalanceThreshold: REBALANCE_THRESHOLD,
             slippagePercentage: SLIPPAGE_SEPOLIA,
-            senderAddress: senderAddress
+            senderAddress: senderAddress,
+            ethPriceMin: ETH_PRICE_MIN,
+            ethPriceMax: ETH_PRICE_MAX,
+            factor: FACTOR
         });
     }
 }
