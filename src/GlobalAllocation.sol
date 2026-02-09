@@ -12,8 +12,11 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     error Allocation__Uint24DesiredAllocationOutsideOfRange();
     error Allocation__Uint256DesiredAllocationOutsideOfRange();
     error Allocation__OverflowUpdatingDesiredAllocation();
-    error Allocation__RebalancePercentageOutsideOfRange();
+    error Allocation__Uint24CurrentAllocationOutsideOfRange();
+    error Allocation__Uint256CurrentAllocationOutsideOfRange();
     error Allocation__OverflowUpdatingCurrentAllocation();
+
+    error Allocation__RebalancePercentageOutsideOfRange();
     error Allocation__ReAllocationNotNeeded();
     error Allocation__ReceiveEthValueIsNull();
     error Allocation__ReceiveToken2ValueIsNull();
@@ -69,30 +72,43 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
 
     /**
      * @dev sets desired allocation percentage
-     * @param _sDesiredAllocationPercentage uint24 0.0000%-100.0000%
+     * @param _desiredAllocationPercentage uint256 0.0000%-100.0000%
      */
-    function setDesiredAllocationPercentage(uint24 _sDesiredAllocationPercentage) public {
-        if (_sDesiredAllocationPercentage <= 0 || _sDesiredAllocationPercentage >= 1e6) {
-            revert Allocation__Uint24DesiredAllocationOutsideOfRange();
-        }
-
-        sDesiredAllocationPercentage = _sDesiredAllocationPercentage;
-    }
-
-    /**
-     * @dev sets desired allocation percentage
-     * @param _sDesiredAllocationPercentage uint256 0.0000%-100.0000%
-     */
-    function setDesiredAllocationPercentageUint256(uint256 _sDesiredAllocationPercentage) public {
-        if (_sDesiredAllocationPercentage <= 0 || _sDesiredAllocationPercentage >= 1e6) {
-            revert Allocation__Uint256DesiredAllocationOutsideOfRange();
-        }
-        if (_sDesiredAllocationPercentage > type(uint24).max) {
+    function setDesiredAllocationPercentageUint256(uint256 _desiredAllocationPercentage) public {
+        if (_desiredAllocationPercentage > type(uint24).max) {
             revert Allocation__OverflowUpdatingDesiredAllocation();
         }
         // casting to 'uint24' is safe because revert-error statement above ensures value ≤ type(uint24).max
         // forge-lint: disable-next-line(unsafe-typecast)
-        setDesiredAllocationPercentage(uint24(_sDesiredAllocationPercentage));
+        setDesiredAllocationPercentage(uint24(_desiredAllocationPercentage));
+    }
+
+    /**
+     * @dev sets desired allocation percentage
+     * @param _desiredAllocationPercentage uint24 0.0000%-100.0000%
+     */
+    function setDesiredAllocationPercentage(uint24 _desiredAllocationPercentage) public {
+        if (_desiredAllocationPercentage <= 0 || _desiredAllocationPercentage >= 1e6) {
+            revert Allocation__Uint24DesiredAllocationOutsideOfRange();
+        }
+
+        sDesiredAllocationPercentage = _desiredAllocationPercentage;
+    }
+
+    function setCurrentAllocationPercentageUint256(uint256 _currentAllocationPercentage) public {
+        if (_currentAllocationPercentage > type(uint24).max) {
+            revert Allocation__OverflowUpdatingCurrentAllocation();
+        }
+        // casting to 'uint24' is safe because revert-error statement above ensures value ≤ type(uint24).max
+        // forge-lint: disable-next-line(unsafe-typecast)
+        setCurrentAllocationPercentage(uint24(_currentAllocationPercentage));
+    }
+
+    function setCurrentAllocationPercentage(uint24 _currentAllocationPercentage) public {
+        if (_currentAllocationPercentage <= 0 || _currentAllocationPercentage >= 1e6) {
+            revert Allocation__Uint24CurrentAllocationOutsideOfRange();
+        }
+        sCurrentAllocationPercentage = _currentAllocationPercentage;
     }
 
     function setRebalanceThreshold(uint24 _rebalanceThreshold) public {
@@ -135,17 +151,13 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
 
         if (address(this).balance == 0) {
             sCurrentAllocationPercentage = 0;
-            return totalPortfolioValueInToken2;
         } else {
-            if (ethPortfolioBalanceInToken2 * 1e6 / totalPortfolioValueInToken2 > type(uint24).max) {
-                revert Allocation__OverflowUpdatingCurrentAllocation();
-            }
-            // casting to 'uint24' is safe because revert-error statement above ensures value ≤ type(uint24).max
-            sCurrentAllocationPercentage =
-            // forge-lint: disable-next-line(unsafe-typecast)
-            uint24(ethPortfolioBalanceInToken2 * 1e6 / totalPortfolioValueInToken2);
+            uint256 currentAllocationPercentage = ethPortfolioBalanceInToken2 * 1e6 / totalPortfolioValueInToken2;
+            setCurrentAllocationPercentageUint256(currentAllocationPercentage);
+
             // console2.log("Current Eth Allocation Percentage:", sCurrentAllocationPercentage);
             // console2.log("Desired Eth Allocation Percentage:", sDesiredAllocationPercentage);
+
             if (
                 (sCurrentAllocationPercentage > sDesiredAllocationPercentage
                             ? sCurrentAllocationPercentage - sDesiredAllocationPercentage
