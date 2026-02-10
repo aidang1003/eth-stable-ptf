@@ -1,7 +1,5 @@
 ## Foundry
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
-
 Foundry consists of:
 
 - **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
@@ -13,7 +11,22 @@ Foundry consists of:
 
 https://book.getfoundry.sh/
 
+
+## Setup Environment
+
+Use env.example to create your own .env file
+
+```shell
+$ source .env
+```
+
 ## Usage
+
+### Install Dependencies
+
+```shell
+$ make install
+```
 
 ### Build
 
@@ -24,7 +37,7 @@ $ forge build
 ### Test
 
 ```shell
-$ forge test
+$ make test-all
 ```
 
 ### Format
@@ -39,22 +52,24 @@ $ forge fmt
 $ forge snapshot
 ```
 
-### Anvil
+### Deploy on testnet
 
 ```shell
-$ anvil
+$ make deploy-sepolia
 ```
 
-### Deploy
+### Deploy on testnet
 
 ```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+$ make deploy-mainnet
 ```
 
-### Cast
+## Cast
+
+### View Wallets
 
 ```shell
-$ cast <subcommand>
+$ cast wallet list
 ```
 
 ### Help

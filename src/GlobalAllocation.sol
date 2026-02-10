@@ -5,13 +5,19 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
-// import {console2} from "forge-std/console2.sol";
+import {UD60x18, ud} from "@prb-math/UD60x18.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract GlobalAllocation is Ownable, ReentrancyGuard {
     /* Errors */
-    error Allocation__DesiredAllocationOutsideOfRange();
-    error Allocation__RebalancePercentageOutsideOfRange();
+    error Allocation__Uint24DesiredAllocationOutsideOfRange();
+    error Allocation__Uint256DesiredAllocationOutsideOfRange();
+    error Allocation__OverflowUpdatingDesiredAllocation();
+    error Allocation__Uint24CurrentAllocationOutsideOfRange();
+    error Allocation__Uint256CurrentAllocationOutsideOfRange();
     error Allocation__OverflowUpdatingCurrentAllocation();
+
+    error Allocation__RebalancePercentageOutsideOfRange();
     error Allocation__ReAllocationNotNeeded();
     error Allocation__ReceiveEthValueIsNull();
     error Allocation__ReceiveToken2ValueIsNull();
@@ -22,8 +28,13 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /* State Variables */
     uint24 public sDesiredAllocationPercentage; // desired allocation percentage for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000
     uint24 public sCurrentAllocationPercentage;
-    uint24 public sRebalanceThreshold; // threshold of when to reset the allocation percentages
+    uint256 public sEthPrice; // Only set when this minus current eth price is outside of sUpdateAllocationThreshold
+    uint256 public sEthPriceMax; // At this Eth price or below hold 100% ETH
+    uint256 public sEthPriceMin; // At this Eth price or above hold 100% of a stable token
+    uint24 public sRebalanceThreshold; // threshold between current and desired allocation for rebalancing
+    uint24 public sUpdateAllocationThreshold; // threshold for adjusting desired allocation percentages
     uint24 public sSlippagePercentage;
+    UD60x18 public immutable I_FACTOR; // Shape the curve to buy/sell ETH on
     address public immutable I_TOKEN1; // token1 address (WETH)
     address public immutable I_TOKEN2; // token2 address
     IUniswapV2Router02 public immutable I_UNISWAP_V2_ROUTER_02;
@@ -41,13 +52,19 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         address _token1,
         address _token2,
         address _uniswapRouter,
-        uint24 _desiredAllocationPercentage,
+        uint24 _desiredAllocationPercentage, // take out after implementing alt method
         uint24 _rebalanceThreshold,
-        uint24 _slippagePercentage
+        uint24 _slippagePercentage,
+        uint256 _ethPriceMin,
+        uint256 _ethPriceMax,
+        uint256 _factor
     ) Ownable(msg.sender) {
         I_TOKEN1 = _token1;
         I_TOKEN2 = _token2;
         I_UNISWAP_V2_ROUTER_02 = IUniswapV2Router02(_uniswapRouter);
+        sEthPriceMin = _ethPriceMin;
+        sEthPriceMax = _ethPriceMax;
+        I_FACTOR = ud(_factor);
         setDesiredAllocationPercentage(_desiredAllocationPercentage);
         setRebalanceThreshold(_rebalanceThreshold);
 
@@ -56,14 +73,43 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
 
     /**
      * @dev sets desired allocation percentage
-     * @param _sDesiredAllocationPercentage 1.0000%-100.0000%
+     * @param _desiredAllocationPercentage uint256 0.0000%-100.0000%
      */
-    function setDesiredAllocationPercentage(uint24 _sDesiredAllocationPercentage) public {
-        if (_sDesiredAllocationPercentage <= 1e4 || _sDesiredAllocationPercentage >= 1e6) {
-            revert Allocation__DesiredAllocationOutsideOfRange();
+    function setDesiredAllocationPercentageUint256(uint256 _desiredAllocationPercentage) public {
+        if (_desiredAllocationPercentage > type(uint24).max) {
+            revert Allocation__OverflowUpdatingDesiredAllocation();
+        }
+        // casting to 'uint24' is safe because revert-error statement above ensures value ≤ type(uint24).max
+        // forge-lint: disable-next-line(unsafe-typecast)
+        setDesiredAllocationPercentage(uint24(_desiredAllocationPercentage));
+    }
+
+    function setDesiredAllocationPercentage(uint24 _desiredAllocationPercentage) public {
+        if (_desiredAllocationPercentage < 0 || _desiredAllocationPercentage > 1e6) {
+            revert Allocation__Uint24DesiredAllocationOutsideOfRange();
         }
 
-        sDesiredAllocationPercentage = _sDesiredAllocationPercentage;
+        sDesiredAllocationPercentage = _desiredAllocationPercentage;
+    }
+
+    /**
+     * @dev sets current allocation percentage
+     * @param _currentAllocationPercentage uint256 0.0000%-100.0000%
+     */
+    function setCurrentAllocationPercentageUint256(uint256 _currentAllocationPercentage) public {
+        if (_currentAllocationPercentage > type(uint24).max) {
+            revert Allocation__OverflowUpdatingCurrentAllocation();
+        }
+        // casting to 'uint24' is safe because revert-error statement above ensures value ≤ type(uint24).max
+        // forge-lint: disable-next-line(unsafe-typecast)
+        setCurrentAllocationPercentage(uint24(_currentAllocationPercentage));
+    }
+
+    function setCurrentAllocationPercentage(uint24 _currentAllocationPercentage) public {
+        if (_currentAllocationPercentage < 0 || _currentAllocationPercentage > 1e6) {
+            revert Allocation__Uint24CurrentAllocationOutsideOfRange();
+        }
+        sCurrentAllocationPercentage = _currentAllocationPercentage;
     }
 
     function setRebalanceThreshold(uint24 _rebalanceThreshold) public {
@@ -75,18 +121,21 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Updates the current allocation percentage based on Uniswap quoted Eth price
-     * If immediatley after deposit use ChainLink Pricefeed to get ETH value in token2 terms
-     * The Chainlink value is to ensure that the Uniswap price quote is reasonable when performing a larger transaction
-     * Use a Uniswap quote to get ETH value in token2 terms
+     * @dev Use a Uniswap quote to get ETH value in token2 terms
+     * Add Eth Price to a state variable if outside of threshold
      */
-    function quoteEthPriceInToken2() private view returns (uint256 ethPriceInToken2) {
+    function quoteEthPriceInToken2() private returns (uint256 ethPriceInToken2) {
         address[] memory token1ToToken2Path = new address[](2);
         token1ToToken2Path[0] = I_TOKEN1;
         token1ToToken2Path[1] = I_TOKEN2;
 
         uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.getAmountsOut(1 ether, token1ToToken2Path);
         ethPriceInToken2 = returnAmounts[1];
+
+        uint256 priceDiff = ethPriceInToken2 > sEthPrice ? ethPriceInToken2 - sEthPrice : sEthPrice - ethPriceInToken2;
+        if (priceDiff * 1e6 / ethPriceInToken2 > sUpdateAllocationThreshold) {
+            sEthPrice = ethPriceInToken2;
+        }
     }
 
     /**
@@ -94,32 +143,30 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      */
     function updateCurrentAllocationPercentage(uint256 ethPriceInToken2)
         private
-        returns (uint256 totalPortfolioValueInToken2)
+        returns (uint256 totalPortfolioValueInToken2, uint256 currentAllocationPercentage)
     {
         uint256 ethPortfolioBalanceInToken2 = ethPriceInToken2 * address(this).balance / 1e18;
         totalPortfolioValueInToken2 = ethPortfolioBalanceInToken2 + IERC20Metadata(I_TOKEN2).balanceOf(address(this));
 
         if (address(this).balance == 0) {
-            sCurrentAllocationPercentage = 0;
-            return totalPortfolioValueInToken2;
+            currentAllocationPercentage = 0;
+        } else if (IERC20Metadata(I_TOKEN2).balanceOf(address(this)) == 0) {
+            currentAllocationPercentage = 1000000;
         } else {
-            if (ethPortfolioBalanceInToken2 * 1e6 / totalPortfolioValueInToken2 > type(uint24).max) {
-                revert Allocation__OverflowUpdatingCurrentAllocation();
-            }
-            // casting to 'uint24' is safe because revert-error statement above ensures value ≤ type(uint24).max
-            sCurrentAllocationPercentage =
-            // forge-lint: disable-next-line(unsafe-typecast)
-            uint24(ethPortfolioBalanceInToken2 * 1e6 / totalPortfolioValueInToken2);
-            // console2.log("Current Eth Allocation Percentage:", sCurrentAllocationPercentage);
+            currentAllocationPercentage = ethPortfolioBalanceInToken2 * 1e6 / totalPortfolioValueInToken2;
+
+            // console2.log("Current Eth Allocation Percentage:", currentAllocationPercentage);
             // console2.log("Desired Eth Allocation Percentage:", sDesiredAllocationPercentage);
-            if (
-                (sCurrentAllocationPercentage > sDesiredAllocationPercentage
-                            ? sCurrentAllocationPercentage - sDesiredAllocationPercentage
-                            : sDesiredAllocationPercentage - sCurrentAllocationPercentage) < sRebalanceThreshold
-            ) {
-                revert Allocation__ReAllocationNotNeeded();
-            }
         }
+
+        if (
+            (currentAllocationPercentage > sDesiredAllocationPercentage
+                        ? currentAllocationPercentage - sDesiredAllocationPercentage
+                        : sDesiredAllocationPercentage - currentAllocationPercentage) < sRebalanceThreshold
+        ) {
+            revert Allocation__ReAllocationNotNeeded();
+        }
+        setCurrentAllocationPercentageUint256(currentAllocationPercentage);
 
         emit RebalancePerformed(totalPortfolioValueInToken2, sCurrentAllocationPercentage / 10000);
         // console2.log("Contract Eth balance", address(this).balance);
@@ -130,31 +177,59 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Allow owner to balance funds manually
+     * @dev Update desired allocation percentage based on formula
+     * @param _ethPriceinToken2 Need the most recent eth quote
      */
-    function balanceFundsExternal() external {
-        emit BalanceFundsCalled(msg.sender);
-        balanceFunds();
+    function updateDesiredAllocationPercentage(uint256 _ethPriceinToken2)
+        public
+        view
+        returns (uint256 desiredAllocation)
+    {
+        if (_ethPriceinToken2 < sEthPriceMin) {
+            desiredAllocation = 1e6; //100%
+        } else if (_ethPriceinToken2 > sEthPriceMax) {
+            desiredAllocation = 0; //0%
+        } else {
+            UD60x18 priceRatio = ud(((_ethPriceinToken2 - sEthPriceMin) * 1e18) / (sEthPriceMax - sEthPriceMin));
+            UD60x18 powered = priceRatio.pow(I_FACTOR);
+
+            uint256 poweredUnwrap = powered.unwrap();
+            uint256 powered4Decimals = poweredUnwrap / 1e12; // truncate down to percent format
+            desiredAllocation = 1e6 - powered4Decimals;
+        }
+
+        // console2.log("Eth Price", _ethPriceinToken2);
+        // console2.log("Price Ratio", priceRatio.unwrap());
+        // console2.log("Exponent", I_FACTOR.unwrap());
+        // console2.log("Powered Unwrap", poweredUnwrap);
+        // console2.log("Powered after truncating decimals", powered4Decimals);
+        // console2.log("Desired Allocation", desiredAllocation);
     }
 
     /**
-     * @dev Balances funds based on desired allocation percentage
+     * @dev Balances funds based on desired and current allocation percentages
      */
-    function balanceFunds() internal {
+    function balanceFunds() public {
+        emit BalanceFundsCalled(msg.sender);
+
         // Get the most recent Eth quote
-        uint256 _ethPriceInToken2 = quoteEthPriceInToken2();
+        uint256 ethPriceInToken2 = quoteEthPriceInToken2();
+
+        uint256 desiredAllocation = updateDesiredAllocationPercentage(ethPriceInToken2);
+        // console2.log("Balance funds desired allocation", desiredAllocation);
+        setDesiredAllocationPercentageUint256(desiredAllocation);
 
         // Update the current allocation percentage
-        uint256 _totalPortfolioValueInToken2 = updateCurrentAllocationPercentage({ethPriceInToken2: _ethPriceInToken2});
+        (uint256 totalPortfolioValueInToken2,) = updateCurrentAllocationPercentage(ethPriceInToken2);
 
         // Logic for balancing funds
         if (sCurrentAllocationPercentage < sDesiredAllocationPercentage) {
             swapTokenForEth({
-                ethPriceInToken2: _ethPriceInToken2, totalPortfolioValueInToken2: _totalPortfolioValueInToken2
+                ethPriceInToken2: ethPriceInToken2, totalPortfolioValueInToken2: totalPortfolioValueInToken2
             });
         } else if (sCurrentAllocationPercentage > sDesiredAllocationPercentage) {
             swapEthForToken({
-                ethPriceInToken2: _ethPriceInToken2, totalPortfolioValueInToken2: _totalPortfolioValueInToken2
+                ethPriceInToken2: ethPriceInToken2, totalPortfolioValueInToken2: totalPortfolioValueInToken2
             });
         } else {
             return;

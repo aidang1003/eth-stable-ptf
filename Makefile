@@ -4,6 +4,8 @@
 
 build :; forge build
 
+install :; git submodule update --init --recursive
+
 test-sepolia :; forge test --fork-url $(SEPOLIA_RPC_URL)
 
 test-mainnet :; forge test --fork-url $(MAINNET_RPC_URL)

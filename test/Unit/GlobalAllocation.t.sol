@@ -8,6 +8,8 @@ import {DeployGlobalAllocation} from "../../script/DeployGlobalAllocation.s.sol"
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import {IUniswapV2Factory} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
+import {IUniswapV2Pair} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 
 contract GlobalAllocationTest is Test {
     HelperConfig public helperConfig;
@@ -94,7 +96,7 @@ contract GlobalAllocationTest is Test {
         vm.startPrank(user);
 
         // First rebalance to swap some ETH for USDC
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         // Record balances after rebalance
         uint256 contractEthBalance = address(globalAllocation).balance;
@@ -131,9 +133,9 @@ contract GlobalAllocationTest is Test {
         uint256 ethBalanceBefore = address(globalAllocation).balance;
         uint256 usdcBalanceBefore = token2.balanceOf(address(globalAllocation));
 
-        // Trigger the swap by calling balanceFundsExternal
+        // Trigger the swap by calling balanceFunds
         // This will call swapEthForToken since all funds are in ETH (currentAllocation > desiredAllocation)
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         // Get balances after swap
         uint256 ethBalanceAfter = address(globalAllocation).balance;
@@ -172,9 +174,9 @@ contract GlobalAllocationTest is Test {
         uint256 ethBalanceBefore = address(globalAllocation).balance;
         uint256 usdcBalanceBefore = token2.balanceOf(address(globalAllocation));
 
-        // Trigger the swap by calling balanceFundsExternal
+        // Trigger the swap by calling balanceFunds
         // This will call swapTokenForEth since we only have USDC (currentAllocation < desiredAllocation)
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         // Get balances after swap
         uint256 ethBalanceAfter = address(globalAllocation).balance;
@@ -193,7 +195,7 @@ contract GlobalAllocationTest is Test {
         vm.startPrank(user);
 
         // First, balance the funds so we're at the desired allocation
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         // Verify we now have both ETH and USDC (meaning we're balanced)
         uint256 ethBalance = address(globalAllocation).balance;
@@ -208,7 +210,7 @@ contract GlobalAllocationTest is Test {
         // Now try to rebalance again - should revert since we're within threshold
         // This tests the absolute difference check works when current ≈ desired
         vm.expectRevert("Allocation__ReAllocationNotNeeded()");
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         vm.stopPrank();
     }
@@ -217,7 +219,7 @@ contract GlobalAllocationTest is Test {
         vm.startPrank(user);
 
         // First, balance the funds so we're at the desired allocation
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         // Verify we now have both ETH and USDC (meaning we're balanced)
         uint256 ethBalance = address(globalAllocation).balance;
@@ -226,13 +228,13 @@ contract GlobalAllocationTest is Test {
         assertGt(usdcBalance, 0, "Should have USDC after first balance");
 
         // Fund the contract with initial ETH deposit
-        bool success = globalAllocation.depositToken2(1e8); // $100
+        bool success = globalAllocation.depositToken2(9e7); // $90
         require(success, "USDC deposit failed");
 
         // Now try to rebalance again - should revert since we're within threshold
         // This tests the absolute difference check works when current ≈ desired
         vm.expectRevert("Allocation__ReAllocationNotNeeded()");
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         vm.stopPrank();
     }
@@ -241,7 +243,7 @@ contract GlobalAllocationTest is Test {
         vm.startPrank(user);
 
         // First swap ETH for USDC to have both assets in the contract
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         // Verify we have both ETH and USDC
         uint256 usdcAfterFirstSwap = token2.balanceOf(address(globalAllocation));
@@ -251,30 +253,42 @@ contract GlobalAllocationTest is Test {
 
         vm.stopPrank();
 
+        // Query actual pool reserves to derive a realistic whale swap amount
+        IUniswapV2Router02 router = IUniswapV2Router02(uniswapV2Router02);
+        address factory = router.factory();
+        address pair = IUniswapV2Factory(factory).getPair(wethAddress, usdcAddress);
+        (uint112 reserve0, uint112 reserve1,) = IUniswapV2Pair(pair).getReserves();
+
+        // Determine which reserve is WETH (token0 is the lower address)
+        uint256 wethReserve = IUniswapV2Pair(pair).token0() == wethAddress ? uint256(reserve0) : uint256(reserve1);
+
+        // Use 30% of pool's WETH reserve — enough to meaningfully crash price
+        // while staying within realistic liquidity bounds on any network
+        uint256 whaleSwapAmount = wethReserve * 30 / 100;
+        require(whaleSwapAmount > 0, "Pool has no WETH liquidity");
+
         // Manipulate the Uniswap pool to decrease ETH price
-        // Have a whale swap a large amount of ETH for USDC to crash ETH price
         address whale = address(0x999);
-        vm.deal(whale, 1000 ether);
+        vm.deal(whale, whaleSwapAmount * 2);
 
         vm.startPrank(whale);
 
         // Get WETH for the whale
-        (bool success,) = wethAddress.call{value: 500 ether}("");
+        (bool success,) = wethAddress.call{value: whaleSwapAmount}("");
         require(success, "WETH deposit failed");
 
         // Approve Uniswap router to spend whale's WETH
-        IERC20(wethAddress).approve(uniswapV2Router02, 500 ether);
+        IERC20(wethAddress).approve(uniswapV2Router02, whaleSwapAmount);
 
         // Build path for swap
         address[] memory path = new address[](2);
         path[0] = wethAddress;
         path[1] = usdcAddress;
 
-        // Whale swaps 500 ETH for USDC, crashing ETH price
-        IUniswapV2Router02(uniswapV2Router02)
-            .swapExactTokensForTokens({
-                amountIn: 500 ether, amountOutMin: 0, path: path, to: whale, deadline: block.timestamp + 15 minutes
-            });
+        // Whale swaps a portion of pool liquidity for USDC, crashing ETH price
+        router.swapExactTokensForTokens({
+            amountIn: whaleSwapAmount, amountOutMin: 0, path: path, to: whale, deadline: block.timestamp + 15 minutes
+        });
 
         vm.stopPrank();
 
@@ -284,9 +298,9 @@ contract GlobalAllocationTest is Test {
         uint256 ethBalanceBefore = address(globalAllocation).balance;
         uint256 usdcBalanceBefore = token2.balanceOf(address(globalAllocation));
 
-        // Trigger the swap by calling balanceFundsExternal
+        // Trigger the swap by calling balanceFunds
         // This will call swapTokenForEth since ETH price crashed (currentAllocation < desiredAllocation)
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         // Get balances after swap
         uint256 ethBalanceAfter = address(globalAllocation).balance;
