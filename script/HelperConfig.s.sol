@@ -11,7 +11,7 @@ abstract contract CodeConstants {
     uint24 constant SLIPPAGE_SEPOLIA = 50000; // 5%
     uint256 constant ETH_PRICE_MIN = 1000000000; // $1000 w/ 6 decimals
     uint256 constant ETH_PRICE_MAX = 8000000000; // $8000 w/ 6 decimals
-    uint24 constant FACTOR = 15000; // 1.5000
+    uint256 constant FACTOR = 15e17; // 1.5
 
     /* WETH Addresses */
     address constant WETH_MAINNET = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // WETH token address on Ethereum Mainnet
@@ -43,7 +43,7 @@ contract HelperConfig is CodeConstants, Script {
         address senderAddress;
         uint256 ethPriceMin;
         uint256 ethPriceMax;
-        uint24 factor;
+        uint256 factor;
     }
 
     mapping(uint256 => NetworkConfig) public networkConfigs;

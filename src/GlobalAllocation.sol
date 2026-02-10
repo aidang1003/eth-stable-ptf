@@ -34,7 +34,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     uint24 public sRebalanceThreshold; // threshold between current and desired allocation for rebalancing
     uint24 public sUpdateAllocationThreshold; // threshold for adjusting desired allocation percentages
     uint24 public sSlippagePercentage;
-    uint24 public immutable I_FACTOR; // Shape the curve to buy/sell ETH on
+    UD60x18 public immutable I_FACTOR; // Shape the curve to buy/sell ETH on
     address public immutable I_TOKEN1; // token1 address (WETH)
     address public immutable I_TOKEN2; // token2 address
     IUniswapV2Router02 public immutable I_UNISWAP_V2_ROUTER_02;
@@ -57,14 +57,14 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         uint24 _slippagePercentage,
         uint256 _ethPriceMin,
         uint256 _ethPriceMax,
-        uint24 _factor
+        uint256 _factor
     ) Ownable(msg.sender) {
         I_TOKEN1 = _token1;
         I_TOKEN2 = _token2;
         I_UNISWAP_V2_ROUTER_02 = IUniswapV2Router02(_uniswapRouter);
         sEthPriceMin = _ethPriceMin;
         sEthPriceMax = _ethPriceMax;
-        I_FACTOR = _factor;
+        I_FACTOR = ud(_factor);
         setDesiredAllocationPercentage(_desiredAllocationPercentage);
         setRebalanceThreshold(_rebalanceThreshold);
 
@@ -178,21 +178,32 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      * @dev Update desired allocation percentage based on formula
      * @param _ethPriceinToken2 Need the most recent eth quote
      */
-    function updateDesiredAllocationPercentage(uint256 _ethPriceinToken2) public returns (uint256 desiredAllocation) {
+    function updateDesiredAllocationPercentage(uint256 _ethPriceinToken2)
+        public
+        view
+        returns (uint256 desiredAllocation)
+    {
         if (_ethPriceinToken2 < sEthPriceMin) {
             desiredAllocation = 1e6; //100%
         } else if (_ethPriceinToken2 > sEthPriceMax) {
             desiredAllocation = 0; //0%
         } else {
-            UD60x18 priceRatio = ud((_ethPriceinToken2 - sEthPriceMin) / (sEthPriceMax - sEthPriceMin));
-            UD60x18 exponent = ud(I_FACTOR);
-            UD60x18 powered = priceRatio.pow(exponent);
+            UD60x18 priceRatio = ud(((_ethPriceinToken2 - sEthPriceMin) * 1e18) / (sEthPriceMax - sEthPriceMin));
+            UD60x18 powered = priceRatio.pow(I_FACTOR);
 
             uint256 poweredUnwrap = powered.unwrap();
+            uint256 powered4Decimals = poweredUnwrap / 1e12; // truncate down to percent format
+            desiredAllocation = 1e6 - powered4Decimals;
+
+            console2.log("Eth Price", _ethPriceinToken2);
+            console2.log("Eth Price Min", sEthPriceMin);
+            console2.log("Eth Price Max", sEthPriceMax);
+            console2.log("Price Ratio", priceRatio.unwrap());
+            console2.log("Exponent", I_FACTOR.unwrap());
             console2.log("Powered Unwrap", poweredUnwrap);
-            desiredAllocation = 1e18 - poweredUnwrap;
+            console2.log("Powered after truncating decimals", powered4Decimals);
+            console2.log("Desired Allocation", desiredAllocation);
         }
-        setDesiredAllocationPercentageUint256(desiredAllocation);
     }
 
     /**
@@ -210,7 +221,8 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         // Get the most recent Eth quote
         uint256 ethPriceInToken2 = quoteEthPriceInToken2();
 
-        updateDesiredAllocationPercentage(ethPriceInToken2);
+        uint256 desiredAllocation = updateDesiredAllocationPercentage(ethPriceInToken2);
+        setDesiredAllocationPercentageUint256(desiredAllocation);
 
         // Update the current allocation percentage
         uint256 _totalPortfolioValueInToken2 = updateCurrentAllocationPercentage({ethPriceInToken2: ethPriceInToken2});
