@@ -197,27 +197,21 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
             uint256 powered4Decimals = poweredUnwrap / 1e12; // truncate down to percent format
             desiredAllocation = 1e6 - powered4Decimals;
 
-            // console2.log("Eth Price", _ethPriceinToken2);
+            console2.log("Eth Price", _ethPriceinToken2);
             // console2.log("Price Ratio", priceRatio.unwrap());
             // console2.log("Exponent", I_FACTOR.unwrap());
             // console2.log("Powered Unwrap", poweredUnwrap);
             // console2.log("Powered after truncating decimals", powered4Decimals);
-            // console2.log("Desired Allocation", desiredAllocation);
+            console2.log("Desired Allocation", desiredAllocation);
         }
     }
 
     /**
-     * @dev Allow owner to balance funds manually
+     * @dev Balances funds based on desired and current allocation percentages
      */
-    function balanceFundsExternal() external {
+    function balanceFunds() public {
         emit BalanceFundsCalled(msg.sender);
-        balanceFunds();
-    }
 
-    /**
-     * @dev Balances funds based on desired allocation percentage
-     */
-    function balanceFunds() internal {
         // Get the most recent Eth quote
         uint256 ethPriceInToken2 = quoteEthPriceInToken2();
 

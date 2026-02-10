@@ -96,7 +96,7 @@ contract GlobalAllocationTest is Test {
         vm.startPrank(user);
 
         // First rebalance to swap some ETH for USDC
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         // Record balances after rebalance
         uint256 contractEthBalance = address(globalAllocation).balance;
@@ -133,9 +133,9 @@ contract GlobalAllocationTest is Test {
         uint256 ethBalanceBefore = address(globalAllocation).balance;
         uint256 usdcBalanceBefore = token2.balanceOf(address(globalAllocation));
 
-        // Trigger the swap by calling balanceFundsExternal
+        // Trigger the swap by calling balanceFunds
         // This will call swapEthForToken since all funds are in ETH (currentAllocation > desiredAllocation)
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         // Get balances after swap
         uint256 ethBalanceAfter = address(globalAllocation).balance;
@@ -174,9 +174,9 @@ contract GlobalAllocationTest is Test {
         uint256 ethBalanceBefore = address(globalAllocation).balance;
         uint256 usdcBalanceBefore = token2.balanceOf(address(globalAllocation));
 
-        // Trigger the swap by calling balanceFundsExternal
+        // Trigger the swap by calling balanceFunds
         // This will call swapTokenForEth since we only have USDC (currentAllocation < desiredAllocation)
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         // Get balances after swap
         uint256 ethBalanceAfter = address(globalAllocation).balance;
@@ -195,7 +195,7 @@ contract GlobalAllocationTest is Test {
         vm.startPrank(user);
 
         // First, balance the funds so we're at the desired allocation
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         // Verify we now have both ETH and USDC (meaning we're balanced)
         uint256 ethBalance = address(globalAllocation).balance;
@@ -210,7 +210,7 @@ contract GlobalAllocationTest is Test {
         // Now try to rebalance again - should revert since we're within threshold
         // This tests the absolute difference check works when current ≈ desired
         vm.expectRevert("Allocation__ReAllocationNotNeeded()");
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         vm.stopPrank();
     }
@@ -219,7 +219,7 @@ contract GlobalAllocationTest is Test {
         vm.startPrank(user);
 
         // First, balance the funds so we're at the desired allocation
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         // Verify we now have both ETH and USDC (meaning we're balanced)
         uint256 ethBalance = address(globalAllocation).balance;
@@ -234,7 +234,7 @@ contract GlobalAllocationTest is Test {
         // Now try to rebalance again - should revert since we're within threshold
         // This tests the absolute difference check works when current ≈ desired
         vm.expectRevert("Allocation__ReAllocationNotNeeded()");
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         vm.stopPrank();
     }
@@ -243,7 +243,7 @@ contract GlobalAllocationTest is Test {
         vm.startPrank(user);
 
         // First swap ETH for USDC to have both assets in the contract
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         // Verify we have both ETH and USDC
         uint256 usdcAfterFirstSwap = token2.balanceOf(address(globalAllocation));
@@ -298,9 +298,9 @@ contract GlobalAllocationTest is Test {
         uint256 ethBalanceBefore = address(globalAllocation).balance;
         uint256 usdcBalanceBefore = token2.balanceOf(address(globalAllocation));
 
-        // Trigger the swap by calling balanceFundsExternal
+        // Trigger the swap by calling balanceFunds
         // This will call swapTokenForEth since ETH price crashed (currentAllocation < desiredAllocation)
-        globalAllocation.balanceFundsExternal();
+        globalAllocation.balanceFunds();
 
         // Get balances after swap
         uint256 ethBalanceAfter = address(globalAllocation).balance;
