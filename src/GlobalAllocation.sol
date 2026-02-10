@@ -85,7 +85,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     }
 
     function setDesiredAllocationPercentage(uint24 _desiredAllocationPercentage) public {
-        if (_desiredAllocationPercentage <= 0 || _desiredAllocationPercentage >= 1e6) {
+        if (_desiredAllocationPercentage < 0 || _desiredAllocationPercentage > 1e6) {
             revert Allocation__Uint24DesiredAllocationOutsideOfRange();
         }
 
@@ -106,7 +106,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     }
 
     function setCurrentAllocationPercentage(uint24 _currentAllocationPercentage) public {
-        if (_currentAllocationPercentage <= 0 || _currentAllocationPercentage >= 1e6) {
+        if (_currentAllocationPercentage < 0 || _currentAllocationPercentage > 1e6) {
             revert Allocation__Uint24CurrentAllocationOutsideOfRange();
         }
         sCurrentAllocationPercentage = _currentAllocationPercentage;
@@ -143,28 +143,30 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      */
     function updateCurrentAllocationPercentage(uint256 ethPriceInToken2)
         private
-        returns (uint256 totalPortfolioValueInToken2)
+        returns (uint256 totalPortfolioValueInToken2, uint256 currentAllocationPercentage)
     {
         uint256 ethPortfolioBalanceInToken2 = ethPriceInToken2 * address(this).balance / 1e18;
         totalPortfolioValueInToken2 = ethPortfolioBalanceInToken2 + IERC20Metadata(I_TOKEN2).balanceOf(address(this));
 
         if (address(this).balance == 0) {
-            sCurrentAllocationPercentage = 0;
+            currentAllocationPercentage = 0;
+        } else if (IERC20Metadata(I_TOKEN2).balanceOf(address(this)) == 0) {
+            currentAllocationPercentage = 1000000;
         } else {
-            uint256 currentAllocationPercentage = ethPortfolioBalanceInToken2 * 1e6 / totalPortfolioValueInToken2;
+            currentAllocationPercentage = ethPortfolioBalanceInToken2 * 1e6 / totalPortfolioValueInToken2;
 
-            // console2.log("Current Eth Allocation Percentage:", sCurrentAllocationPercentage);
+            console2.log("Current Eth Allocation Percentage:", currentAllocationPercentage);
             // console2.log("Desired Eth Allocation Percentage:", sDesiredAllocationPercentage);
-
-            if (
-                (currentAllocationPercentage > sDesiredAllocationPercentage
-                            ? currentAllocationPercentage - sDesiredAllocationPercentage
-                            : sDesiredAllocationPercentage - currentAllocationPercentage) < sRebalanceThreshold
-            ) {
-                revert Allocation__ReAllocationNotNeeded();
-            }
-            setCurrentAllocationPercentageUint256(currentAllocationPercentage);
         }
+
+        if (
+            (currentAllocationPercentage > sDesiredAllocationPercentage
+                        ? currentAllocationPercentage - sDesiredAllocationPercentage
+                        : sDesiredAllocationPercentage - currentAllocationPercentage) < sRebalanceThreshold
+        ) {
+            revert Allocation__ReAllocationNotNeeded();
+        }
+        setCurrentAllocationPercentageUint256(currentAllocationPercentage);
 
         emit RebalancePerformed(totalPortfolioValueInToken2, sCurrentAllocationPercentage / 10000);
         // console2.log("Contract Eth balance", address(this).balance);
@@ -196,8 +198,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
             desiredAllocation = 1e6 - powered4Decimals;
 
             console2.log("Eth Price", _ethPriceinToken2);
-            console2.log("Eth Price Min", sEthPriceMin);
-            console2.log("Eth Price Max", sEthPriceMax);
             console2.log("Price Ratio", priceRatio.unwrap());
             console2.log("Exponent", I_FACTOR.unwrap());
             console2.log("Powered Unwrap", poweredUnwrap);
@@ -225,16 +225,16 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         setDesiredAllocationPercentageUint256(desiredAllocation);
 
         // Update the current allocation percentage
-        uint256 _totalPortfolioValueInToken2 = updateCurrentAllocationPercentage({ethPriceInToken2: ethPriceInToken2});
+        (uint256 totalPortfolioValueInToken2,) = updateCurrentAllocationPercentage(ethPriceInToken2);
 
         // Logic for balancing funds
         if (sCurrentAllocationPercentage < sDesiredAllocationPercentage) {
             swapTokenForEth({
-                ethPriceInToken2: ethPriceInToken2, totalPortfolioValueInToken2: _totalPortfolioValueInToken2
+                ethPriceInToken2: ethPriceInToken2, totalPortfolioValueInToken2: totalPortfolioValueInToken2
             });
         } else if (sCurrentAllocationPercentage > sDesiredAllocationPercentage) {
             swapEthForToken({
-                ethPriceInToken2: ethPriceInToken2, totalPortfolioValueInToken2: _totalPortfolioValueInToken2
+                ethPriceInToken2: ethPriceInToken2, totalPortfolioValueInToken2: totalPortfolioValueInToken2
             });
         } else {
             return;
