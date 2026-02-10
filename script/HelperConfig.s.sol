@@ -9,8 +9,10 @@ abstract contract CodeConstants {
     uint24 constant REBALANCE_THRESHOLD = 40000; // 4%
     uint24 constant SLIPPAGE_MAINNET = 6500; // .65%
     uint24 constant SLIPPAGE_SEPOLIA = 50000; // 5%
-    uint256 constant ETH_PRICE_MIN = 1000000000; // $1000 w/ 6 decimals
-    uint256 constant ETH_PRICE_MAX = 8000000000; // $8000 w/ 6 decimals
+    uint256 constant MAINNET_ETH_PRICE_MIN = 1000000000; // $1000 w/ 6 decimals
+    uint256 constant MAINNET_ETH_PRICE_MAX = 8000000000; // $8000 w/ 6 decimals
+    uint256 constant SEPOLIA_ETH_PRICE_MIN = 1000000; // $1 w/ 6 decimals
+    uint256 constant SEPOLIA_ETH_PRICE_MAX = 80000000000; // $80000 w/ 6 decimals
     uint256 constant FACTOR = 15e17; // 1.5
 
     /* WETH Addresses */
@@ -80,8 +82,8 @@ contract HelperConfig is CodeConstants, Script {
             rebalanceThreshold: REBALANCE_THRESHOLD,
             slippagePercentage: SLIPPAGE_MAINNET,
             senderAddress: senderAddress,
-            ethPriceMin: ETH_PRICE_MIN,
-            ethPriceMax: ETH_PRICE_MAX,
+            ethPriceMin: MAINNET_ETH_PRICE_MIN,
+            ethPriceMax: MAINNET_ETH_PRICE_MAX,
             factor: FACTOR
         });
     }
@@ -96,8 +98,8 @@ contract HelperConfig is CodeConstants, Script {
             rebalanceThreshold: REBALANCE_THRESHOLD,
             slippagePercentage: SLIPPAGE_SEPOLIA,
             senderAddress: senderAddress,
-            ethPriceMin: ETH_PRICE_MIN,
-            ethPriceMax: ETH_PRICE_MAX,
+            ethPriceMin: SEPOLIA_ETH_PRICE_MIN,
+            ethPriceMax: SEPOLIA_ETH_PRICE_MAX,
             factor: FACTOR
         });
     }

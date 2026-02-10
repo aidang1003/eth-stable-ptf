@@ -40,8 +40,8 @@ jobs:
       - name: Run Forge build
         run: forge build --sizes
 
-      # - name: Run Sepolia Forge Tests
-      #   run: forge test --fork-url $SEPOLIA_RPC_URL
+      - name: Run Sepolia Forge Tests
+        run: forge test --fork-url $SEPOLIA_RPC_URL
 
       - name: Run Mainnet Forge Tests
         run: forge test --fork-url $MAINNET_RPC_URL
