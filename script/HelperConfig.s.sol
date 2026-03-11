@@ -12,7 +12,7 @@ abstract contract CodeConstants {
     uint256 constant MAINNET_ETH_PRICE_MIN = 1000000000; // $1000 w/ 6 decimals
     uint256 constant MAINNET_ETH_PRICE_MAX = 8000000000; // $8000 w/ 6 decimals
     uint256 constant SEPOLIA_ETH_PRICE_MIN = 1000000; // $1 w/ 6 decimals
-    uint256 constant SEPOLIA_ETH_PRICE_MAX = 80000000000; // $80000 w/ 6 decimals
+    uint256 constant SEPOLIA_ETH_PRICE_MAX = 32000000000; // $32000 w/ 6 decimals
     uint256 constant FACTOR = 15e17; // 1.5
 
     /* WETH Addresses */
