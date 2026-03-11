@@ -16,6 +16,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     error Allocation__Uint24CurrentAllocationOutsideOfRange();
     error Allocation__Uint256CurrentAllocationOutsideOfRange();
     error Allocation__OverflowUpdatingCurrentAllocation();
+    error Allocation__SlippagePercentageOutsideOfRange();
 
     error Allocation__RebalancePercentageOutsideOfRange();
     error Allocation__ReAllocationNotNeeded();
@@ -67,8 +68,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         I_FACTOR = ud(_factor);
         setDesiredAllocationPercentage(_desiredAllocationPercentage);
         setRebalanceThreshold(_rebalanceThreshold);
-
-        sSlippagePercentage = _slippagePercentage;
+        setSlippagePercentage(_slippagePercentage);
     }
 
     /**
@@ -118,6 +118,20 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         }
 
         sRebalanceThreshold = _rebalanceThreshold;
+    }
+
+    /**
+     * @param _slippagePercentage uint24 0.0000%-100.0000%
+     */
+    function setSlippagePercentage(uint24 _slippagePercentage) public {
+        if (_slippagePercentage < 0 || _slippagePercentage > 1e8) {
+            revert Allocation__SlippagePercentageOutsideOfRange();
+        }
+        sSlippagePercentage = _slippagePercentage;
+    }
+
+    function getSlippagePercentage() public view returns (uint24) {
+        return sSlippagePercentage;
     }
 
     /**
