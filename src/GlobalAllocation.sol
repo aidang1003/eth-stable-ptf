@@ -124,7 +124,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      * @dev Use a Uniswap quote to get ETH value in token2 terms
      * Add Eth Price to a state variable if outside of threshold
      */
-    function quoteEthPriceInToken2() private returns (uint256 ethPriceInToken2) {
+    function quoteEthPriceInToken2() public returns (uint256 ethPriceInToken2) {
         address[] memory token1ToToken2Path = new address[](2);
         token1ToToken2Path[0] = I_TOKEN1;
         token1ToToken2Path[1] = I_TOKEN2;
