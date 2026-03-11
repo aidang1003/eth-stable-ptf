@@ -228,7 +228,7 @@ contract GlobalAllocationTest is Test {
         assertGt(usdcBalance, 0, "Should have USDC after first balance");
 
         // Fund the contract with initial ETH deposit
-        bool success = globalAllocation.depositToken2(9e7); // $90
+        bool success = globalAllocation.depositToken2(6e7); // $60
         require(success, "USDC deposit failed");
 
         // Now try to rebalance again - should revert since we're within threshold
