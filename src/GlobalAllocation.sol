@@ -122,16 +122,36 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
 
     /**
      * @dev Use a Uniswap quote to get ETH value in token2 terms
-     * Add Eth Price to a state variable if outside of threshold
+     * Only read from chain state
      */
-    function quoteEthPriceInToken2() public returns (uint256 ethPriceInToken2) {
+    function quoteEthPriceInToken2() public view returns (uint256 ethPriceInToken2) {
         address[] memory token1ToToken2Path = new address[](2);
         token1ToToken2Path[0] = I_TOKEN1;
         token1ToToken2Path[1] = I_TOKEN2;
 
         uint256[] memory returnAmounts = I_UNISWAP_V2_ROUTER_02.getAmountsOut(1 ether, token1ToToken2Path);
         ethPriceInToken2 = returnAmounts[1];
+    }
 
+    /**
+     * @dev Check if the change in Eth price is greater than the threshold for updating allocation percentages
+     * designed to be called off-chain before balancing funds
+     * @param ethPriceInToken2
+     */
+    function updateEthPrice(uint256 ethPriceInToken2) public view returns (bool update) {
+        uint256 priceDiff = ethPriceInToken2 > sEthPrice ? ethPriceInToken2 - sEthPrice : sEthPrice - ethPriceInToken2;
+        if (priceDiff * 1e6 / ethPriceInToken2 > sUpdateAllocationThreshold) {
+            update = true;
+        } else {
+            update = false;
+        }
+    }
+
+    /**
+     *
+     * @param ethPriceInToken2 Only update sEthPRice if we're doing a re-balance
+     */
+    function setEthPriceInToken2(uint256 ethPriceInToken2) public {
         uint256 priceDiff = ethPriceInToken2 > sEthPrice ? ethPriceInToken2 - sEthPrice : sEthPrice - ethPriceInToken2;
         if (priceDiff * 1e6 / ethPriceInToken2 > sUpdateAllocationThreshold) {
             sEthPrice = ethPriceInToken2;
