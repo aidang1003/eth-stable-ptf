@@ -136,7 +136,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /**
      * @dev Check if the change in Eth price is greater than the threshold for updating allocation percentages
      * designed to be called off-chain before balancing funds
-     * @param ethPriceInToken2
+     * @param ethPriceInToken2 use quoteEthPriceInToken2() to determine off-chain if the contract should re-balance
      */
     function updateEthPrice(uint256 ethPriceInToken2) public view returns (bool update) {
         uint256 priceDiff = ethPriceInToken2 > sEthPrice ? ethPriceInToken2 - sEthPrice : sEthPrice - ethPriceInToken2;
@@ -198,19 +198,14 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
 
     /**
      * @dev Update desired allocation percentage based on formula
-     * @param _ethPriceinToken2 Need the most recent eth quote
      */
-    function updateDesiredAllocationPercentage(uint256 _ethPriceinToken2)
-        public
-        view
-        returns (uint256 desiredAllocation)
-    {
-        if (_ethPriceinToken2 < sEthPriceMin) {
+    function updateDesiredAllocationPercentage() public view returns (uint256 desiredAllocation) {
+        if (sEthPrice < sEthPriceMin) {
             desiredAllocation = 1e6; //100%
-        } else if (_ethPriceinToken2 > sEthPriceMax) {
+        } else if (sEthPrice > sEthPriceMax) {
             desiredAllocation = 0; //0%
         } else {
-            UD60x18 priceRatio = ud(((_ethPriceinToken2 - sEthPriceMin) * 1e18) / (sEthPriceMax - sEthPriceMin));
+            UD60x18 priceRatio = ud(((sEthPrice - sEthPriceMin) * 1e18) / (sEthPriceMax - sEthPriceMin));
             UD60x18 powered = priceRatio.pow(I_FACTOR);
 
             uint256 poweredUnwrap = powered.unwrap();
@@ -228,6 +223,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
 
     /**
      * @dev Balances funds based on desired and current allocation percentages
+     * Will cost gas to call
      */
     function balanceFunds() public {
         emit BalanceFundsCalled(msg.sender);
@@ -235,7 +231,10 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         // Get the most recent Eth quote
         uint256 ethPriceInToken2 = quoteEthPriceInToken2();
 
-        uint256 desiredAllocation = updateDesiredAllocationPercentage(ethPriceInToken2);
+        // Assign ETH price to state variable
+        updateEthPrice(ethPriceInToken2);
+
+        uint256 desiredAllocation = updateDesiredAllocationPercentage();
         // console2.log("Balance funds desired allocation", desiredAllocation);
         setDesiredAllocationPercentageUint256(desiredAllocation);
 

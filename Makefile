@@ -6,6 +6,10 @@ build :; forge build
 
 install :; git submodule update --init --recursive
 
+chain :; anvil --fork-url $(MAINNET_RPC_URL) -p 8545
+
+test-local :; forge test --fork-url 127.0.0.1:8545
+
 test-sepolia :; forge test --fork-url $(SEPOLIA_RPC_URL)
 
 test-mainnet :; forge test --fork-url $(MAINNET_RPC_URL)
