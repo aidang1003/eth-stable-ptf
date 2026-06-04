@@ -16,6 +16,9 @@ test-mainnet :; forge test --fork-url $(MAINNET_RPC_URL)
 
 test-all :; forge test --fork-url $(MAINNET_RPC_URL) && forge test --fork-url $(SEPOLIA_RPC_URL)
 
+deploy-local :
+	@forge script script/DeployGlobalAllocation.s.sol:DeployGlobalAllocation --rpc-url 127.0.0.1:8545 --account $(CAST_WALLET) --broadcast
+
 deploy-sepolia :
 	@forge script script/DeployGlobalAllocation.s.sol:DeployGlobalAllocation --rpc-url $(SEPOLIA_RPC_URL) --account $(CAST_WALLET) --broadcast --verify --etherscan-api-key $(ETHERSCAN_API_KEY) -vvvv
 
