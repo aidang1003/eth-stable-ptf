@@ -152,7 +152,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      * designed to be called off-chain before balancing funds
      * @param ethPriceInToken2 use quoteEthPriceInToken2() to determine off-chain if the contract should re-balance
      */
-    function updateEthPrice(uint256 ethPriceInToken2) public view returns (bool update) {
+    function shouldRebalance(uint256 ethPriceInToken2) public view returns (bool update) {
         uint256 priceDiff = ethPriceInToken2 > sEthPrice ? ethPriceInToken2 - sEthPrice : sEthPrice - ethPriceInToken2;
         if (priceDiff * 1e6 / ethPriceInToken2 > sUpdateAllocationThreshold) {
             update = true;
@@ -175,7 +175,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /**
      * @dev Update Portfolio based on most recently quoted token2 value
      */
-    function updateCurrentAllocationPercentage(uint256 ethPriceInToken2)
+    function getNewCurrentAllocationPercentage(uint256 ethPriceInToken2)
         private
         returns (uint256 totalPortfolioValueInToken2, uint256 currentAllocationPercentage)
     {
@@ -193,46 +193,39 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
             // console2.log("Desired Eth Allocation Percentage:", sDesiredAllocationPercentage);
         }
 
-        if (
-            (currentAllocationPercentage > sDesiredAllocationPercentage
-                        ? currentAllocationPercentage - sDesiredAllocationPercentage
-                        : sDesiredAllocationPercentage - currentAllocationPercentage) < sRebalanceThreshold
-        ) {
+        uint256 allocationDifference = currentAllocationPercentage >= sDesiredAllocationPercentage
+            ? currentAllocationPercentage - sDesiredAllocationPercentage
+            : sDesiredAllocationPercentage - currentAllocationPercentage;
+
+        if (allocationDifference < sRebalanceThreshold) {
             revert Allocation__ReAllocationNotNeeded();
         }
+
         setCurrentAllocationPercentageUint256(currentAllocationPercentage);
 
         emit RebalancePerformed(totalPortfolioValueInToken2, sCurrentAllocationPercentage / 10000);
-        // console2.log("Contract Eth balance", address(this).balance);
-        // console2.log("Eth balance in token2", ethPortfolioBalanceInToken2);
-        // console2.log("Contract token2 balance", IERC20Metadata(I_TOKEN2).balanceOf(address(this)));
-        // console2.log("Total portfolio balnce in token2", totalPortfolioValueInToken2); // 6 decimals
-        // console2.log("Eth To Token2 allocation percentage", sCurrentAllocationPercentage); // 4 decimals
+
     }
 
     /**
      * @dev Update desired allocation percentage based on formula
      */
-    function updateDesiredAllocationPercentage() public view returns (uint256 desiredAllocation) {
-        if (sEthPrice < sEthPriceMin) {
+    function getNewDesiredAllocationPercentage() public view returns (uint256 desiredAllocation) {
+        // get most recent Eth price in token2 terms
+        uint256 ethPrice = quoteEthPriceInToken2();
+
+        if (ethPrice < sEthPriceMin) {
             desiredAllocation = 1e6; //100%
-        } else if (sEthPrice > sEthPriceMax) {
+        } else if (ethPrice > sEthPriceMax) {
             desiredAllocation = 0; //0%
         } else {
-            UD60x18 priceRatio = ud(((sEthPrice - sEthPriceMin) * 1e18) / (sEthPriceMax - sEthPriceMin));
+            UD60x18 priceRatio = ud(((ethPrice - sEthPriceMin) * 1e18) / (sEthPriceMax - sEthPriceMin));
             UD60x18 powered = priceRatio.pow(I_FACTOR);
 
             uint256 poweredUnwrap = powered.unwrap();
             uint256 powered4Decimals = poweredUnwrap / 1e12; // truncate down to percent format
             desiredAllocation = 1e6 - powered4Decimals;
         }
-
-        // console2.log("Eth Price", _ethPriceinToken2);
-        // console2.log("Price Ratio", priceRatio.unwrap());
-        // console2.log("Exponent", I_FACTOR.unwrap());
-        // console2.log("Powered Unwrap", poweredUnwrap);
-        // console2.log("Powered after truncating decimals", powered4Decimals);
-        // console2.log("Desired Allocation", desiredAllocation);
     }
 
     /**
@@ -245,15 +238,20 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         // Get the most recent Eth quote
         uint256 ethPriceInToken2 = quoteEthPriceInToken2();
 
-        // Assign ETH price to state variable
-        updateEthPrice(ethPriceInToken2);
+        // Should we rebalance based on change in Eth price?
+        if (!shouldRebalance(ethPriceInToken2)) {
+            return;
+        }
 
-        uint256 desiredAllocation = updateDesiredAllocationPercentage();
+        // Persist the new ETH price so getNewDesiredAllocationPercentage() runs on it
+        setEthPriceInToken2(ethPriceInToken2);
+
+        uint256 desiredAllocation = getNewDesiredAllocationPercentage();
         // console2.log("Balance funds desired allocation", desiredAllocation);
         setDesiredAllocationPercentageUint256(desiredAllocation);
 
         // Update the current allocation percentage
-        (uint256 totalPortfolioValueInToken2,) = updateCurrentAllocationPercentage(ethPriceInToken2);
+        (uint256 totalPortfolioValueInToken2,) = getNewCurrentAllocationPercentage(ethPriceInToken2);
 
         // Logic for balancing funds
         if (sCurrentAllocationPercentage < sDesiredAllocationPercentage) {

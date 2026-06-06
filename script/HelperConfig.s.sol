@@ -6,10 +6,11 @@ import {Script} from "forge-std/Script.sol";
 abstract contract CodeConstants {
     /* Global Allocation Deploy values */
     uint24 constant DESIRED_ETH_ALLOCATION_PERCENTAGE = 500000; // 50%
-    uint24 constant REBALANCE_THRESHOLD = 40000; // 4%
+    uint24 constant REBALANCE_THRESHOLD_MAINNET = 40000; // 4%
+    uint24 constant REBALANCE_THRESHOLD_SEPOLIA = 2000; // .2%
     uint24 constant SLIPPAGE_MAINNET = 6500; // .65%
     uint24 constant SLIPPAGE_SEPOLIA = 50000; // 5%
-    uint256 constant MAINNET_ETH_PRICE_MIN = 1000000000; // $1000 w/ 6 decimals
+    uint256 constant MAINNET_ETH_PRICE_MIN = 1000000; // $1 w/ 6 decimals
     uint256 constant MAINNET_ETH_PRICE_MAX = 8000000000; // $8000 w/ 6 decimals
     uint256 constant SEPOLIA_ETH_PRICE_MIN = 1000000; // $1 w/ 6 decimals
     uint256 constant SEPOLIA_ETH_PRICE_MAX = 32000000000; // $32000 w/ 6 decimals
@@ -79,7 +80,7 @@ contract HelperConfig is CodeConstants, Script {
             token2: USDC_MAINNET,
             uniswapRouter: UNISWAP_V2_ROUTER02_MAINNET,
             desiredAllocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
-            rebalanceThreshold: REBALANCE_THRESHOLD,
+            rebalanceThreshold: REBALANCE_THRESHOLD_MAINNET,
             slippagePercentage: SLIPPAGE_MAINNET,
             senderAddress: senderAddress,
             ethPriceMin: MAINNET_ETH_PRICE_MIN,
@@ -95,7 +96,7 @@ contract HelperConfig is CodeConstants, Script {
             token2: USDC_SEPOLIA,
             uniswapRouter: UNISWAP_V2_ROUTER02_SEPOLIA,
             desiredAllocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
-            rebalanceThreshold: REBALANCE_THRESHOLD,
+            rebalanceThreshold: REBALANCE_THRESHOLD_SEPOLIA,
             slippagePercentage: SLIPPAGE_SEPOLIA,
             senderAddress: senderAddress,
             ethPriceMin: SEPOLIA_ETH_PRICE_MIN,

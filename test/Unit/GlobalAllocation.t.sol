@@ -6,12 +6,12 @@ import {Test} from "forge-std/Test.sol";
 import {GlobalAllocation} from "../../src/GlobalAllocation.sol";
 import {DeployGlobalAllocation} from "../../script/DeployGlobalAllocation.s.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {HelperConfig} from "../../script/HelperConfig.s.sol";
+import {HelperConfig, CodeConstants} from "../../script/HelperConfig.s.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import {IUniswapV2Factory} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Pair} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 
-contract GlobalAllocationTest is Test {
+contract GlobalAllocationTest is Test, CodeConstants {
     HelperConfig public helperConfig;
 
     address public wethAddress;
@@ -192,6 +192,14 @@ contract GlobalAllocationTest is Test {
     }
 
     function testRebalanceRevertsWhenEthHigherWithinThreshold() public {
+        // Only reachable on a pool deep enough that one rebalance lands inside the
+        // threshold band. The thin Sepolia WETH/USDC pool moves price ~1.5% per
+        // rebalance, which exceeds any sane threshold, so this scenario is mainnet-only.
+        if (block.chainid != ETH_MAINNET_CHAIN_ID) {
+            vm.skip(true);
+            return;
+        }
+
         vm.startPrank(user);
 
         // First, balance the funds so we're at the desired allocation
@@ -203,8 +211,15 @@ contract GlobalAllocationTest is Test {
         assertGt(ethBalance, 0, "Should have ETH after first balance");
         assertGt(usdcBalance, 0, "Should have USDC after first balance");
 
-        // Fund the contract with initial ETH deposit
-        (bool success,) = address(globalAllocation).call{value: 6e16}(""); // 0.06 ether
+        // Add ETH worth a quarter of the rebalance threshold's share of the portfolio,
+        // so the allocation drifts but stays inside the band on any network's config.
+        uint256 price = globalAllocation.quoteEthPriceInToken2();
+        uint256 portfolioValueInToken2 = ethBalance * price / 1e18 + usdcBalance;
+        uint256 depositValueInToken2 =
+            portfolioValueInToken2 * globalAllocation.sRebalanceThreshold() / 1e6 / 4;
+        uint256 ethToDeposit = depositValueInToken2 * 1e18 / price;
+
+        (bool success,) = address(globalAllocation).call{value: ethToDeposit}("");
         require(success, "Deposit failed");
 
         // Now try to rebalance again - should revert since we're within threshold
@@ -216,6 +231,14 @@ contract GlobalAllocationTest is Test {
     }
 
     function testRebalanceRevertsWhenUsdHigherWithinThreshold() public {
+        // Only reachable on a pool deep enough that one rebalance lands inside the
+        // threshold band. The thin Sepolia WETH/USDC pool moves price ~1.5% per
+        // rebalance, which exceeds any sane threshold, so this scenario is mainnet-only.
+        if (block.chainid != ETH_MAINNET_CHAIN_ID) {
+            vm.skip(true);
+            return;
+        }
+
         vm.startPrank(user);
 
         // First, balance the funds so we're at the desired allocation
@@ -227,8 +250,15 @@ contract GlobalAllocationTest is Test {
         assertGt(ethBalance, 0, "Should have ETH after first balance");
         assertGt(usdcBalance, 0, "Should have USDC after first balance");
 
-        // Fund the contract with initial ETH deposit
-        bool success = globalAllocation.depositToken2(6e7); // $60
+        // Add token2 worth a quarter of the rebalance threshold's share of the portfolio,
+        // so the allocation drifts but stays inside the band on any network's config.
+        uint256 price = globalAllocation.quoteEthPriceInToken2();
+        uint256 portfolioValueInToken2 = ethBalance * price / 1e18 + usdcBalance;
+        uint256 depositValueInToken2 =
+            portfolioValueInToken2 * globalAllocation.sRebalanceThreshold() / 1e6 / 4;
+
+        deal(usdcAddress, user, depositValueInToken2);
+        bool success = globalAllocation.depositToken2(depositValueInToken2);
         require(success, "USDC deposit failed");
 
         // Now try to rebalance again - should revert since we're within threshold
