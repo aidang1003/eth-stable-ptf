@@ -6,6 +6,7 @@ import {Script} from "forge-std/Script.sol";
 abstract contract CodeConstants {
     /* Global Allocation Deploy values */
     uint24 constant DESIRED_ETH_ALLOCATION_PERCENTAGE = 500000; // 50%
+    uint24 constant UPDATE_ALLOCATION_THRESHOLD = 10000; // 1%
     uint24 constant REBALANCE_THRESHOLD_MAINNET = 40000; // 4%
     uint24 constant REBALANCE_THRESHOLD_SEPOLIA = 2000; // .2%
     uint24 constant SLIPPAGE_MAINNET = 6500; // .65%
@@ -41,6 +42,7 @@ contract HelperConfig is CodeConstants, Script {
         address token2;
         address uniswapRouter;
         uint24 desiredAllocationPercentage;
+        uint24 updateAllocationThreshold;
         uint24 rebalanceThreshold;
         uint24 slippagePercentage;
         address senderAddress;
@@ -80,6 +82,7 @@ contract HelperConfig is CodeConstants, Script {
             token2: USDC_MAINNET,
             uniswapRouter: UNISWAP_V2_ROUTER02_MAINNET,
             desiredAllocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
+            updateAllocationThreshold: UPDATE_ALLOCATION_THRESHOLD,
             rebalanceThreshold: REBALANCE_THRESHOLD_MAINNET,
             slippagePercentage: SLIPPAGE_MAINNET,
             senderAddress: senderAddress,
@@ -96,6 +99,7 @@ contract HelperConfig is CodeConstants, Script {
             token2: USDC_SEPOLIA,
             uniswapRouter: UNISWAP_V2_ROUTER02_SEPOLIA,
             desiredAllocationPercentage: DESIRED_ETH_ALLOCATION_PERCENTAGE,
+            updateAllocationThreshold: UPDATE_ALLOCATION_THRESHOLD,
             rebalanceThreshold: REBALANCE_THRESHOLD_SEPOLIA,
             slippagePercentage: SLIPPAGE_SEPOLIA,
             senderAddress: senderAddress,

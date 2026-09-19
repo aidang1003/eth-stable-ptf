@@ -17,6 +17,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     error Allocation__Uint256CurrentAllocationOutsideOfRange();
     error Allocation__OverflowUpdatingCurrentAllocation();
     error Allocation__SlippagePercentageOutsideOfRange();
+    error Allocation__SetUpdateAllocationThresholdOutsideOfRange();
 
     error Allocation__RebalancePercentageOutsideOfRange();
     error Allocation__ReAllocationNotNeeded();
@@ -55,6 +56,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         address _uniswapRouter,
         uint24 _desiredAllocationPercentage, // take out after implementing alt method
         uint24 _rebalanceThreshold,
+        uint24 _updateAllocationThreshold,
         uint24 _slippagePercentage,
         uint256 _ethPriceMin,
         uint256 _ethPriceMax,
@@ -63,12 +65,13 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         I_TOKEN1 = _token1;
         I_TOKEN2 = _token2;
         I_UNISWAP_V2_ROUTER_02 = IUniswapV2Router02(_uniswapRouter);
+        setDesiredAllocationPercentage(_desiredAllocationPercentage);
+        setRebalanceThreshold(_rebalanceThreshold);
+        setUpdateAllocationthreshold(_updateAllocationThreshold);
+        setSlippagePercentage(_slippagePercentage);
         sEthPriceMin = _ethPriceMin;
         sEthPriceMax = _ethPriceMax;
         I_FACTOR = ud(_factor);
-        setDesiredAllocationPercentage(_desiredAllocationPercentage);
-        setRebalanceThreshold(_rebalanceThreshold);
-        setSlippagePercentage(_slippagePercentage);
     }
 
     /**
@@ -135,6 +138,21 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @param _updateAllocationThreshold uint24 0.0000%-100.0000%
+     * Threshold for when price has changed enough to rebalance
+     */
+    function setUpdateAllocationthreshold(uint24 _updateAllocationThreshold) public {
+        if (_updateAllocationThreshold < 0 || _updateAllocationThreshold > 1e8) {
+            revert Allocation__SetUpdateAllocationThresholdOutsideOfRange();
+        }
+        sUpdateAllocationThreshold = _updateAllocationThreshold;
+    }
+
+    function getUpdateAllocationthreshold() public view returns (uint24) {
+        return sUpdateAllocationThreshold;
+    }
+
+    /**
      * @dev Use a Uniswap quote to get ETH value in token2 terms
      * Only read from chain state
      */
@@ -148,11 +166,18 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @dev Should rebalance without needing to input a price
+     */
+    function shouldRebalance() public view returns (bool update) {
+        return shouldRebalance(quoteEthPriceInToken2());
+    }
+
+    /**
      * @dev Check if the change in Eth price is greater than the threshold for updating allocation percentages
      * designed to be called off-chain before balancing funds
      * @param ethPriceInToken2 use quoteEthPriceInToken2() to determine off-chain if the contract should re-balance
      */
-    function shouldRebalance(uint256 ethPriceInToken2) public view returns (bool update) {
+    function shouldRebalance(uint256 ethPriceInToken2) private view returns (bool update) {
         uint256 priceDiff = ethPriceInToken2 > sEthPrice ? ethPriceInToken2 - sEthPrice : sEthPrice - ethPriceInToken2;
         if (priceDiff * 1e6 / ethPriceInToken2 > sUpdateAllocationThreshold) {
             update = true;
@@ -166,8 +191,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      * @param ethPriceInToken2 Only update sEthPRice if we're doing a re-balance
      */
     function setEthPriceInToken2(uint256 ethPriceInToken2) public {
-        uint256 priceDiff = ethPriceInToken2 > sEthPrice ? ethPriceInToken2 - sEthPrice : sEthPrice - ethPriceInToken2;
-        if (priceDiff * 1e6 / ethPriceInToken2 > sUpdateAllocationThreshold) {
+        if (shouldRebalance(ethPriceInToken2)) {
             sEthPrice = ethPriceInToken2;
         }
     }

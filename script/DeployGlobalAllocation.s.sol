@@ -25,6 +25,7 @@ contract DeployGlobalAllocation is Script {
             _desiredAllocationPercentage: config.desiredAllocationPercentage,
             _rebalanceThreshold: config.rebalanceThreshold,
             _slippagePercentage: config.slippagePercentage,
+            _updateAllocationThreshold: config.updateAllocationThreshold,
             _ethPriceMin: config.ethPriceMin,
             _ethPriceMax: config.ethPriceMax,
             _factor: config.factor

@@ -191,6 +191,55 @@ contract GlobalAllocationTest is Test, CodeConstants {
         vm.stopPrank();
     }
 
+    /**
+     * @dev Move the pool's ETH price with a whale swap sized as a percent of the relevant
+     * reserve. Selling WETH pushes the price down, selling token2 pushes it up. Constant
+     * product means a 2% reserve swap moves price roughly 4%, clearing any sane update
+     * threshold. Must not be called while another prank is active.
+     */
+    function whaleMovePrice(bool sellEth, uint256 reservePercent) private {
+        IUniswapV2Router02 router = IUniswapV2Router02(uniswapV2Router02);
+        address pair = IUniswapV2Factory(router.factory()).getPair(wethAddress, usdcAddress);
+        (uint112 reserve0, uint112 reserve1,) = IUniswapV2Pair(pair).getReserves();
+
+        // Determine which reserve is WETH (token0 is the lower address)
+        bool wethIsToken0 = IUniswapV2Pair(pair).token0() == wethAddress;
+        uint256 wethReserve = wethIsToken0 ? uint256(reserve0) : uint256(reserve1);
+        uint256 usdcReserve = wethIsToken0 ? uint256(reserve1) : uint256(reserve0);
+
+        address whale = address(0x999);
+        address[] memory path = new address[](2);
+        uint256 amountIn;
+
+        if (sellEth) {
+            amountIn = wethReserve * reservePercent / 100;
+            path[0] = wethAddress;
+            path[1] = usdcAddress;
+            vm.deal(whale, amountIn);
+        } else {
+            amountIn = usdcReserve * reservePercent / 100;
+            path[0] = usdcAddress;
+            path[1] = wethAddress;
+            deal(usdcAddress, whale, amountIn);
+        }
+        require(amountIn > 0, "Pool has no liquidity");
+
+        vm.startPrank(whale);
+
+        // Wrap the whale's ETH before swapping
+        if (sellEth) {
+            (bool success,) = wethAddress.call{value: amountIn}("");
+            require(success, "WETH deposit failed");
+        }
+
+        IERC20(path[0]).approve(uniswapV2Router02, amountIn);
+        router.swapExactTokensForTokens({
+            amountIn: amountIn, amountOutMin: 0, path: path, to: whale, deadline: block.timestamp + 15 minutes
+        });
+
+        vm.stopPrank();
+    }
+
     function testRebalanceRevertsWhenEthHigherWithinThreshold() public {
         // Only reachable on a pool deep enough that one rebalance lands inside the
         // threshold band. The thin Sepolia WETH/USDC pool moves price ~1.5% per
@@ -206,17 +255,29 @@ contract GlobalAllocationTest is Test, CodeConstants {
         globalAllocation.balanceFunds();
 
         // Verify we now have both ETH and USDC (meaning we're balanced)
-        uint256 ethBalance = address(globalAllocation).balance;
-        uint256 usdcBalance = token2.balanceOf(address(globalAllocation));
-        assertGt(ethBalance, 0, "Should have ETH after first balance");
-        assertGt(usdcBalance, 0, "Should have USDC after first balance");
+        assertGt(address(globalAllocation).balance, 0, "Should have ETH after first balance");
+        assertGt(token2.balanceOf(address(globalAllocation)), 0, "Should have USDC after first balance");
 
-        // Add ETH worth a quarter of the rebalance threshold's share of the portfolio,
-        // so the allocation drifts but stays inside the band on any network's config.
+        vm.stopPrank();
+
+        // Drop the ETH price so the next call clears the update threshold. Without this
+        // balanceFunds() returns at the price gate and never reaches the allocation check.
+        whaleMovePrice({sellEth: true, reservePercent: 2});
+
+        vm.startPrank(user);
+
+        // Add ETH to land the allocation a quarter of the rebalance band above the
+        // desired allocation the contract will recompute at the new price, so the
+        // allocation drifts but stays inside the band on any network's config.
         uint256 price = globalAllocation.quoteEthPriceInToken2();
-        uint256 portfolioValueInToken2 = ethBalance * price / 1e18 + usdcBalance;
+        uint256 ethValueInToken2 = address(globalAllocation).balance * price / 1e18;
+        uint256 portfolioValueInToken2 = ethValueInToken2 + token2.balanceOf(address(globalAllocation));
+        uint256 targetAllocation =
+            globalAllocation.getNewDesiredAllocationPercentage() + globalAllocation.sRebalanceThreshold() / 4;
+
+        // Solve targetAllocation = (ethValue + deposit) / (portfolioValue + deposit)
         uint256 depositValueInToken2 =
-            portfolioValueInToken2 * globalAllocation.sRebalanceThreshold() / 1e6 / 4;
+            (targetAllocation * portfolioValueInToken2 - ethValueInToken2 * 1e6) / (1e6 - targetAllocation);
         uint256 ethToDeposit = depositValueInToken2 * 1e18 / price;
 
         (bool success,) = address(globalAllocation).call{value: ethToDeposit}("");
@@ -245,17 +306,28 @@ contract GlobalAllocationTest is Test, CodeConstants {
         globalAllocation.balanceFunds();
 
         // Verify we now have both ETH and USDC (meaning we're balanced)
-        uint256 ethBalance = address(globalAllocation).balance;
-        uint256 usdcBalance = token2.balanceOf(address(globalAllocation));
-        assertGt(ethBalance, 0, "Should have ETH after first balance");
-        assertGt(usdcBalance, 0, "Should have USDC after first balance");
+        assertGt(address(globalAllocation).balance, 0, "Should have ETH after first balance");
+        assertGt(token2.balanceOf(address(globalAllocation)), 0, "Should have USDC after first balance");
 
-        // Add token2 worth a quarter of the rebalance threshold's share of the portfolio,
-        // so the allocation drifts but stays inside the band on any network's config.
+        vm.stopPrank();
+
+        // Raise the ETH price so the next call clears the update threshold. Without this
+        // balanceFunds() returns at the price gate and never reaches the allocation check.
+        whaleMovePrice({sellEth: false, reservePercent: 2});
+
+        vm.startPrank(user);
+
+        // Add token2 to land the allocation a quarter of the rebalance band below the
+        // desired allocation the contract will recompute at the new price, so the
+        // allocation drifts but stays inside the band on any network's config.
         uint256 price = globalAllocation.quoteEthPriceInToken2();
-        uint256 portfolioValueInToken2 = ethBalance * price / 1e18 + usdcBalance;
-        uint256 depositValueInToken2 =
-            portfolioValueInToken2 * globalAllocation.sRebalanceThreshold() / 1e6 / 4;
+        uint256 ethValueInToken2 = address(globalAllocation).balance * price / 1e18;
+        uint256 portfolioValueInToken2 = ethValueInToken2 + token2.balanceOf(address(globalAllocation));
+        uint256 targetAllocation =
+            globalAllocation.getNewDesiredAllocationPercentage() - globalAllocation.sRebalanceThreshold() / 4;
+
+        // Solve targetAllocation = ethValue / (portfolioValue + deposit)
+        uint256 depositValueInToken2 = ethValueInToken2 * 1e6 / targetAllocation - portfolioValueInToken2;
 
         deal(usdcAddress, user, depositValueInToken2);
         bool success = globalAllocation.depositToken2(depositValueInToken2);
@@ -343,5 +415,15 @@ contract GlobalAllocationTest is Test, CodeConstants {
         assertGt(ethBalanceAfter, ethBalanceBefore, "ETH balance should increase after swap");
 
         vm.stopPrank();
+    }
+
+    function testShouldRebalance() public {
+        // sEthPrice is 0 on a fresh deploy, so the live quote reads as a full move
+        assertTrue(globalAllocation.shouldRebalance(), "Should rebalance before an ETH price is recorded");
+
+        // Record the live price; with the pool untouched the price is now within the threshold
+        globalAllocation.setEthPriceInToken2(globalAllocation.quoteEthPriceInToken2());
+
+        assertFalse(globalAllocation.shouldRebalance(), "Should not rebalance when the ETH price has not moved");
     }
 }
