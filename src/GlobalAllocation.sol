@@ -28,13 +28,14 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     error Allocation__TokenWithdrawFailed();
 
     /* State Variables */
-    uint24 public sDesiredAllocationPercentage; // desired allocation percentage for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000
-    uint24 public sCurrentAllocationPercentage; // current allocation percentage for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000
+    uint24 public sDesiredAllocationPercentage; // desired allocation percentage for ( ETH(in USD) / ETH(in USD) * USDC ) * 1e6
+    uint24 public sCurrentAllocationPercentage; // current allocation percentage for ( ETH(in USD) / ETH(in USD) * USDC ) * 1e6
     uint256 public sEthPriceMax; // At this Eth price or below hold 100% ETH
     uint256 public sEthPriceMin; // At this Eth price or above hold 100% of a stable token
     uint256 public sEthPrice; // Only set when this minus current eth price is outside of sRebalanceThreshold
     uint24 public sRebalanceThreshold; // Threshold between current and desired allocation which must be exceeded before rebalancing takes place
     uint24 public sDesiredAllocationUpdateThreshold; // Threshold for adjusting desired allocation percentages
+    uint24 public sCurrentAllocationUpdateThreshold; // Threshold for adjusting current allocation percentages
     uint24 public sSlippagePercentage; // Tolerable slippage percentage for performing token swap
     UD60x18 public immutable I_FACTOR; // Shape the curve to buy/sell ETH on
     address public immutable I_TOKEN1; // token1 address (WETH)
@@ -84,14 +85,6 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         }
 
         sDesiredAllocationPercentage = _desiredAllocationPercentage;
-    }
-
-    /**
-     * @dev sets current allocation percentage
-     * @param _currentAllocationPercentage uint256 0.0000%-100.0000%
-     */
-    function setCurrentAllocationPercentageUint256(uint256 _currentAllocationPercentage) public {
-
     }
 
     /**
@@ -199,10 +192,11 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
 
     /**
      * @dev Update Portfolio based on most recently quoted token2 value
+     * Only updates state object if the difference is larger than sCurrentAllocationUpdateThreshold
      */
     function getNewCurrentAllocationPercentage(uint256 ethPriceInToken2)
         private
-        returns (uint256 totalPortfolioValueInToken2, uint256 currentAllocationPercentage)
+        returns (uint256 totalPortfolioValueInToken2, uint24 currentAllocationPercentage)
     {
         uint256 ethPortfolioBalanceInToken2 = ethPriceInToken2 * address(this).balance / 1e18;
         totalPortfolioValueInToken2 = ethPortfolioBalanceInToken2 + IERC20Metadata(I_TOKEN2).balanceOf(address(this));
@@ -210,23 +204,28 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         if (address(this).balance == 0) {
             currentAllocationPercentage = 0;
         } else if (IERC20Metadata(I_TOKEN2).balanceOf(address(this)) == 0) {
-            currentAllocationPercentage = 1000000;
+            currentAllocationPercentage = 1e6;
         } else {
-            currentAllocationPercentage = ethPortfolioBalanceInToken2 * 1e6 / totalPortfolioValueInToken2;
+            uint256 currentAllocationPercentageUint256 = ethPortfolioBalanceInToken2 * 1e6 / totalPortfolioValueInToken2;
 
-            // console2.log("Current Eth Allocation Percentage:", currentAllocationPercentage);
-            // console2.log("Desired Eth Allocation Percentage:", sDesiredAllocationPercentage);
+            if (currentAllocationPercentageUint256 > type(uint24).max) {
+                revert Allocation__OverflowUpdatingCurrentAllocation();
+            }
+            // casting to 'uint24' is safe because revert-error statement above ensures value ≤ type(uint24).max
+            // forge-lint: disable-next-line(unsafe-typecast)
+            currentAllocationPercentage = 1e6 - uint24(currentAllocationPercentageUint256);
         }
 
         uint256 allocationDifference = currentAllocationPercentage >= sDesiredAllocationPercentage
             ? currentAllocationPercentage - sDesiredAllocationPercentage
             : sDesiredAllocationPercentage - currentAllocationPercentage;
 
-        if (allocationDifference < sRebalanceThreshold) {
+        // Revert before setting state or else could infinitely update
+        if (allocationDifference < sCurrentAllocationUpdateThreshold) {
             revert Allocation__ReAllocationNotNeeded();
         }
 
-        setCurrentAllocationPercentageUint256(currentAllocationPercentage);
+        setCurrentAllocationPercentage(currentAllocationPercentage);
 
         emit RebalancePerformed(totalPortfolioValueInToken2, sCurrentAllocationPercentage / 10000);
 
