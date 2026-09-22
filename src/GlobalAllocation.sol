@@ -29,13 +29,13 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
 
     /* State Variables */
     uint24 public sDesiredAllocationPercentage; // desired allocation percentage for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000
-    uint24 public sCurrentAllocationPercentage;
-    uint256 public sEthPrice; // Only set when this minus current eth price is outside of sUpdateAllocationThreshold
+    uint24 public sCurrentAllocationPercentage; // current allocation percentage for ( ETH(in USD) / ETH(in USD) * USDC ) * 1000000
     uint256 public sEthPriceMax; // At this Eth price or below hold 100% ETH
     uint256 public sEthPriceMin; // At this Eth price or above hold 100% of a stable token
-    uint24 public sRebalanceThreshold; // threshold between current and desired allocation for rebalancing
-    uint24 public sUpdateAllocationThreshold; // threshold for adjusting desired allocation percentages
-    uint24 public sSlippagePercentage;
+    uint256 public sEthPrice; // Only set when this minus current eth price is outside of sRebalanceThreshold
+    uint24 public sRebalanceThreshold; // Threshold between current and desired allocation which must be exceeded before rebalancing takes place
+    uint24 public sDesiredAllocationUpdateThreshold; // Threshold for adjusting desired allocation percentages
+    uint24 public sSlippagePercentage; // Tolerable slippage percentage for performing token swap
     UD60x18 public immutable I_FACTOR; // Shape the curve to buy/sell ETH on
     address public immutable I_TOKEN1; // token1 address (WETH)
     address public immutable I_TOKEN2; // token2 address
@@ -76,17 +76,8 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
 
     /**
      * @dev sets desired allocation percentage
-     * @param _desiredAllocationPercentage uint256 0.0000%-100.0000%
+     * @param _desiredAllocationPercentage uint24 0.0000%-100.0000%
      */
-    function setDesiredAllocationPercentageUint256(uint256 _desiredAllocationPercentage) public {
-        if (_desiredAllocationPercentage > type(uint24).max) {
-            revert Allocation__OverflowUpdatingDesiredAllocation();
-        }
-        // casting to 'uint24' is safe because revert-error statement above ensures value ≤ type(uint24).max
-        // forge-lint: disable-next-line(unsafe-typecast)
-        setDesiredAllocationPercentage(uint24(_desiredAllocationPercentage));
-    }
-
     function setDesiredAllocationPercentage(uint24 _desiredAllocationPercentage) public {
         if (_desiredAllocationPercentage < 0 || _desiredAllocationPercentage > 1e6) {
             revert Allocation__Uint24DesiredAllocationOutsideOfRange();
@@ -100,14 +91,13 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      * @param _currentAllocationPercentage uint256 0.0000%-100.0000%
      */
     function setCurrentAllocationPercentageUint256(uint256 _currentAllocationPercentage) public {
-        if (_currentAllocationPercentage > type(uint24).max) {
-            revert Allocation__OverflowUpdatingCurrentAllocation();
-        }
-        // casting to 'uint24' is safe because revert-error statement above ensures value ≤ type(uint24).max
-        // forge-lint: disable-next-line(unsafe-typecast)
-        setCurrentAllocationPercentage(uint24(_currentAllocationPercentage));
+
     }
 
+    /**
+     * @dev sets current allocation percentage
+     * @param _currentAllocationPercentage uint24 0.0000%-100.0000%
+     */
     function setCurrentAllocationPercentage(uint24 _currentAllocationPercentage) public {
         if (_currentAllocationPercentage < 0 || _currentAllocationPercentage > 1e6) {
             revert Allocation__Uint24CurrentAllocationOutsideOfRange();
@@ -115,6 +105,12 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         sCurrentAllocationPercentage = _currentAllocationPercentage;
     }
 
+    /**
+     * @dev sets rebalance threshold
+     * Threshold between sDesiredAllocationPercentage and sCurrentAllocationPercentage
+     * If the difference exceeds this threshold rebalancing will happen
+     * @param _rebalanceThreshold uint24 0.1000%-10.0000%
+     */
     function setRebalanceThreshold(uint24 _rebalanceThreshold) public {
         if (_rebalanceThreshold <= 1e3 || _rebalanceThreshold >= 1e5) {
             revert Allocation__RebalancePercentageOutsideOfRange();
@@ -124,32 +120,37 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @dev Slippage percentage set for the call to Uniswap
      * @param _slippagePercentage uint24 0.0000%-100.0000%
      */
     function setSlippagePercentage(uint24 _slippagePercentage) public {
-        if (_slippagePercentage < 0 || _slippagePercentage > 1e8) {
+        if (_slippagePercentage < 0 || _slippagePercentage > 1e6) {
             revert Allocation__SlippagePercentageOutsideOfRange();
         }
         sSlippagePercentage = _slippagePercentage;
     }
 
+    /**
+     * @dev Returns slippage percentage
+     */
     function getSlippagePercentage() public view returns (uint24) {
         return sSlippagePercentage;
     }
 
     /**
+     * @dev 
      * @param _updateAllocationThreshold uint24 0.0000%-100.0000%
      * Threshold for when price has changed enough to rebalance
      */
     function setUpdateAllocationthreshold(uint24 _updateAllocationThreshold) public {
-        if (_updateAllocationThreshold < 0 || _updateAllocationThreshold > 1e8) {
+        if (_updateAllocationThreshold < 0 || _updateAllocationThreshold > 1e6) {
             revert Allocation__SetUpdateAllocationThresholdOutsideOfRange();
         }
-        sUpdateAllocationThreshold = _updateAllocationThreshold;
+        sDesiredAllocationUpdateThreshold = _updateAllocationThreshold;
     }
 
     function getUpdateAllocationthreshold() public view returns (uint24) {
-        return sUpdateAllocationThreshold;
+        return sDesiredAllocationUpdateThreshold;
     }
 
     /**
@@ -179,7 +180,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
      */
     function shouldRebalance(uint256 ethPriceInToken2) private view returns (bool update) {
         uint256 priceDiff = ethPriceInToken2 > sEthPrice ? ethPriceInToken2 - sEthPrice : sEthPrice - ethPriceInToken2;
-        if (priceDiff * 1e6 / ethPriceInToken2 > sUpdateAllocationThreshold) {
+        if (priceDiff * 1e6 / ethPriceInToken2 > sRebalanceThreshold) {
             update = true;
         } else {
             update = false;
@@ -234,7 +235,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /**
      * @dev Update desired allocation percentage based on formula
      */
-    function getNewDesiredAllocationPercentage() public view returns (uint256 desiredAllocation) {
+    function getNewDesiredAllocationPercentage() public view returns (uint24 desiredAllocation) {
         // get most recent Eth price in token2 terms
         uint256 ethPrice = quoteEthPriceInToken2();
 
@@ -248,7 +249,13 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
 
             uint256 poweredUnwrap = powered.unwrap();
             uint256 powered4Decimals = poweredUnwrap / 1e12; // truncate down to percent format
-            desiredAllocation = 1e6 - powered4Decimals;
+
+            if (powered4Decimals > type(uint24).max) {
+                revert Allocation__OverflowUpdatingDesiredAllocation();
+            }
+            // casting to 'uint24' is safe because revert-error statement above ensures value ≤ type(uint24).max
+            // forge-lint: disable-next-line(unsafe-typecast)
+            desiredAllocation = 1e6 - uint24(powered4Decimals);
         }
     }
 
@@ -270,9 +277,9 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
         // Persist the new ETH price so getNewDesiredAllocationPercentage() runs on it
         setEthPriceInToken2(ethPriceInToken2);
 
-        uint256 desiredAllocation = getNewDesiredAllocationPercentage();
+        uint24 desiredAllocation = getNewDesiredAllocationPercentage();
         // console2.log("Balance funds desired allocation", desiredAllocation);
-        setDesiredAllocationPercentageUint256(desiredAllocation);
+        setDesiredAllocationPercentage(desiredAllocation);
 
         // Update the current allocation percentage
         (uint256 totalPortfolioValueInToken2,) = getNewCurrentAllocationPercentage(ethPriceInToken2);
