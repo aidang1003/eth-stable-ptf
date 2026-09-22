@@ -169,6 +169,7 @@ contract GlobalAllocation is Ownable, ReentrancyGuard {
     /**
      * @dev Check if the change in Eth price is greater than the threshold for updating allocation percentages
      * designed to be called off-chain before balancing funds
+     * TODO Needs to be evaluated as a function of the current and desired allocation percentages
      * @param ethPriceInToken2 use quoteEthPriceInToken2() to determine off-chain if the contract should re-balance
      */
     function shouldRebalance(uint256 ethPriceInToken2) private view returns (bool update) {
